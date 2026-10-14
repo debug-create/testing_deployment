@@ -109,3 +109,26 @@ def get_playback_status(id: str, db: Session = Depends(get_db)):
     if not scenario:
         raise ScenarioNotFoundError(id)
     return playback_manager.get_status(id)
+
+@router.post("/scenarios/{id}/campaigns/generate")
+def generate_campaign_endpoint(
+    id: str,
+    template: str = "payment",
+    auto_load: bool = True,
+    db: Session = Depends(get_db)
+):
+    from app.demo.campaigns import generate_synthetic_campaign
+    from app.services.playback import playback_manager
+    scenario = ScenarioRepository(db).get_or_seed_demo(id)
+    if not scenario:
+        raise ScenarioNotFoundError(id)
+
+    campaign = generate_synthetic_campaign(id, template)
+    if auto_load:
+        playback_manager.load_timeline(id, campaign["events"])
+        campaign["playback_staged"] = True
+    else:
+        campaign["playback_staged"] = False
+
+    return campaign
+

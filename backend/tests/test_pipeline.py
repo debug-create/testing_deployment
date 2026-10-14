@@ -304,3 +304,127 @@ def test_audit_trail_export():
     assert csv_res.status_code == 200
     assert "text/csv" in csv_res.headers["content-type"]
     assert "record_id,scenario_id,action" in csv_res.text
+
+def test_graph_chokepoints_and_blast_radius():
+    res = client.get("/api/v1/scenarios/scenario_demo/chokepoints")
+    assert res.status_code == 200
+    data = res.json()
+    assert "blast_radius_rankings" in data
+    assert len(data["blast_radius_rankings"]) > 0
+    assert "all_edge_bottlenecks" in data
+    assert "summary" in data
+
+    # Highest blast radius node should be an upstream node with many downstream dependents
+    top_blast = data["blast_radius_rankings"][0]
+    assert "blast_radius_score" in top_blast
+    assert top_blast["blast_radius_score"] > 0
+
+def test_attack_narrative_generation():
+    paths_res = client.get("/api/v1/scenarios/scenario_demo/paths")
+    assert paths_res.status_code == 200
+    paths = paths_res.json()["paths"]
+    assert len(paths) > 0
+
+    first_path_id = paths[0]["path_id"]
+    nar_res = client.get(f"/api/v1/scenarios/scenario_demo/paths/{first_path_id}/narrative")
+    assert nar_res.status_code == 200
+    nar = nar_res.json()
+    assert "executive_summary" in nar
+    assert "step_by_step_forensics" in nar
+    assert len(nar["step_by_step_forensics"]) == len(paths[0]["hops"])
+    assert "defensive_recommendation" in nar
+
+def test_deception_attribution():
+    # Check baseline deception status
+    res = client.get("/api/v1/scenarios/scenario_demo/deception/status")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["total_canaries_deployed"] >= 1
+    assert any(c["canary_id"] == "decoy_honeypot" for c in data["canary_assets"])
+
+    # Simulate intruder probing canary rel_06 (host_bastion -> decoy_honeypot)
+    probe_res = client.post(
+        "/api/v1/scenarios/scenario_demo/events",
+        json={
+            "event_type": "canary_probe",
+            "source": "honeypot_daemon",
+            "payload": {
+                "subject_id": "rel_06",
+                "subject_type": "relationship",
+                "confidence": 0.99,
+                "probe_type": "icmp_sweep"
+            }
+        }
+    )
+    assert probe_res.status_code == 201
+
+    # Check deception status again - should attribute intruder to host_bastion
+    res_after = client.get("/api/v1/scenarios/scenario_demo/deception/status")
+    assert res_after.status_code == 200
+    data_after = res_after.json()
+    assert data_after["total_tripwire_triggers"] >= 1
+    assert len(data_after["attributed_intruders"]) >= 1
+    intruder = data_after["attributed_intruders"][0]
+    assert intruder["intruder_node_id"] == "host_bastion"
+    assert intruder["canary_touched_id"] == "decoy_honeypot"
+
+def test_synthetic_campaign_generation_and_staging():
+    # Generate payment breach campaign
+    camp_res = client.post("/api/v1/scenarios/scenario_demo/campaigns/generate?template=payment")
+    assert camp_res.status_code == 200
+    camp = camp_res.json()
+    assert camp["template"] == "payment_breach"
+    assert camp["total_stages"] == 6
+    assert camp["playback_staged"] is True
+
+    # Verify playback queue received all 6 events
+    stat_res = client.get("/api/v1/scenarios/scenario_demo/playback/status")
+    assert stat_res.status_code == 200
+    assert stat_res.json()["staged_events_remaining"] == 6
+
+    # Step through stage 1
+    step_res = client.post("/api/v1/scenarios/scenario_demo/playback/step")
+    assert step_res.status_code == 200
+    assert step_res.json()["current_step"] == 1
+    assert step_res.json()["remaining_events"] == 5
+
+    # Also verify k8s and ad campaign generation
+    k8s_camp = client.post("/api/v1/scenarios/scenario_k8s/campaigns/generate?template=k8s&auto_load=false").json()
+    assert k8s_camp["template"] == "k8s_escape"
+    assert k8s_camp["total_stages"] >= 5
+
+    ad_camp = client.post("/api/v1/scenarios/scenario_ad/campaigns/generate?template=ad&auto_load=false").json()
+    assert ad_camp["template"] == "ad_ransomware"
+    assert ad_camp["total_stages"] >= 5
+
+def test_unified_dashboard_state():
+    res = client.get("/api/v1/scenarios/scenario_demo/dashboard-state")
+    assert res.status_code == 200
+    dash = res.json()
+
+    assert "scenario" in dash
+    assert dash["scenario"]["id"] == "scenario_demo"
+
+    assert "topology" in dash
+    assert dash["topology"]["node_count"] >= 6
+    assert dash["topology"]["edge_count"] >= 6
+
+    assert "attack_paths" in dash
+    assert dash["attack_paths"]["total_paths"] > 0
+    # Top path should contain embedded narrative
+    top_path = dash["attack_paths"]["paths"][0]
+    assert "narrative" in top_path
+    assert "executive_summary" in top_path["narrative"]
+
+    assert "reachability" in dash
+    assert "target_reachability" in dash["reachability"]
+
+    assert "chokepoints" in dash
+    assert "all_edge_bottlenecks" in dash["chokepoints"]
+
+    assert "deception" in dash
+    assert "canary_assets" in dash["deception"]
+
+    assert "recommended_remediation" in dash
+    assert "selected_interventions" in dash["recommended_remediation"]
+

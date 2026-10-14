@@ -94,3 +94,17 @@ def get_trust_vectors(id: str, db: Session = Depends(get_db)):
     for a in assets:
         result[a.id] = compute_trust_vector(a.id, {"properties": a.properties or {}}, evidence_by_subject.get(a.id, []))
     return result
+
+@router.get("/scenarios/{id}/deception/status")
+def get_deception_status(id: str, db: Session = Depends(get_db)):
+    from app.risk.deception import analyze_deception_status
+    scenario = ScenarioRepository(db).get_or_seed_demo(id)
+    if not scenario:
+        raise ScenarioNotFoundError(id)
+
+    assets = AssetRepository(db).list_by_scenario(id)
+    relationships = RelationshipRepository(db).list_by_scenario(id)
+    evidence_items = EvidenceRepository(db).list_by_scenario(id)
+
+    return analyze_deception_status(assets, relationships, evidence_items)
+

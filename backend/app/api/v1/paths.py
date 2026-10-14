@@ -52,3 +52,37 @@ def get_attack_path_detail(id: str, path_id: str, db: Session = Depends(get_db))
         if p.path_id == path_id:
             return p
     raise EntityNotFoundError("AttackPath", path_id)
+
+@router.get("/scenarios/{id}/paths/{path_id}/narrative")
+def get_attack_path_narrative(id: str, path_id: str, db: Session = Depends(get_db)):
+    from app.paths.narrative import generate_attack_narrative
+    scenario = ScenarioRepository(db).get_or_seed_demo(id)
+    if not scenario:
+        raise ScenarioNotFoundError(id)
+
+    assets = AssetRepository(db).list_by_scenario(id)
+    node_names = {a.id: a.name for a in assets}
+
+    ranked_paths = _recompute_paths(db, id)
+    target_path = next((p for p in ranked_paths if p.path_id == path_id), None)
+    if not target_path:
+        raise EntityNotFoundError("AttackPath", path_id)
+
+    return generate_attack_narrative(target_path, node_names)
+
+@router.get("/scenarios/{id}/chokepoints")
+def get_chokepoints_and_blast_radius(id: str, db: Session = Depends(get_db)):
+    from app.paths.chokepoints import compute_graph_chokepoints_and_blast_radius
+    scenario = ScenarioRepository(db).get_or_seed_demo(id)
+    if not scenario:
+        raise ScenarioNotFoundError(id)
+
+    assets = AssetRepository(db).list_by_scenario(id)
+    relationships = RelationshipRepository(db).list_by_scenario(id)
+    evidence = EvidenceRepository(db).list_by_scenario(id)
+
+    ir = build_ir_graph(id, scenario.graph_version, assets, relationships, evidence)
+    twin = SecurityDigitalTwin(ir)
+
+    ranked_paths = _recompute_paths(db, id)
+    return compute_graph_chokepoints_and_blast_radius(twin, ranked_paths)
