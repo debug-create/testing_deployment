@@ -78,3 +78,27 @@ def run_intervention_optimizer(id: str, payload: InterventionOptimizeRequest, db
         candidates=candidates,
         current_paths=current_paths
     )
+
+@router.post("/scenarios/{id}/interventions/{intervention_id}/export")
+def export_intervention_code(
+    id: str,
+    intervention_id: str,
+    format: str = "terraform",
+    db: Session = Depends(get_db)
+):
+    from app.optimization.code_gen import generate_remediation_code
+    scenario = ScenarioRepository(db).get_or_seed_demo(id)
+    if not scenario:
+        raise ScenarioNotFoundError(id)
+
+    # Locate candidate metadata from defaults or candidate list
+    candidate = next((c for c in DEFAULT_CANDIDATES if c.id == intervention_id), None)
+    name = candidate.name if candidate else intervention_id
+    affected = candidate.affected_relationship_ids if candidate else []
+
+    return generate_remediation_code(
+        intervention_id=intervention_id,
+        intervention_name=name,
+        format_type=format,
+        affected_relationships=affected
+    )

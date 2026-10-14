@@ -77,3 +77,35 @@ def get_event_timeline(id: str, db: Session = Depends(get_db)):
         ))
 
     return response_list
+
+@router.post("/scenarios/{id}/events/batch", status_code=status.HTTP_201_CREATED)
+async def batch_ingest_events(id: str, events: List[SecurityEventCreate], db: Session = Depends(get_db)):
+    from app.services.playback import playback_manager
+    scenario = ScenarioRepository(db).get_or_seed_demo(id)
+    if not scenario:
+        raise ScenarioNotFoundError(id)
+    return await playback_manager.batch_ingest(id, events, db)
+
+@router.post("/scenarios/{id}/playback/load")
+def load_playback_timeline(id: str, events: List[SecurityEventCreate], db: Session = Depends(get_db)):
+    from app.services.playback import playback_manager
+    scenario = ScenarioRepository(db).get_or_seed_demo(id)
+    if not scenario:
+        raise ScenarioNotFoundError(id)
+    return playback_manager.load_timeline(id, events)
+
+@router.post("/scenarios/{id}/playback/step")
+async def step_playback_timeline(id: str, db: Session = Depends(get_db)):
+    from app.services.playback import playback_manager
+    scenario = ScenarioRepository(db).get_or_seed_demo(id)
+    if not scenario:
+        raise ScenarioNotFoundError(id)
+    return await playback_manager.step(id, db)
+
+@router.get("/scenarios/{id}/playback/status")
+def get_playback_status(id: str, db: Session = Depends(get_db)):
+    from app.services.playback import playback_manager
+    scenario = ScenarioRepository(db).get_or_seed_demo(id)
+    if not scenario:
+        raise ScenarioNotFoundError(id)
+    return playback_manager.get_status(id)

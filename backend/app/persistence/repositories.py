@@ -16,9 +16,16 @@ class ScenarioRepository:
 
     def get_or_seed_demo(self, scenario_id: str) -> Optional[ScenarioModel]:
         sc = self.get(scenario_id)
-        if not sc and scenario_id == "scenario_demo":
-            from app.demo.scenarios import seed_demo_scenario
-            return seed_demo_scenario(self.db, scenario_id)
+        if not sc:
+            if scenario_id == "scenario_demo":
+                from app.demo.scenarios import seed_demo_scenario
+                return seed_demo_scenario(self.db, scenario_id)
+            elif scenario_id == "scenario_k8s":
+                from app.demo.scenarios_extended import seed_k8s_scenario
+                return seed_k8s_scenario(self.db, scenario_id)
+            elif scenario_id == "scenario_ad":
+                from app.demo.scenarios_extended import seed_ad_scenario
+                return seed_ad_scenario(self.db, scenario_id)
         return sc
 
     def list_all(self) -> List[ScenarioModel]:

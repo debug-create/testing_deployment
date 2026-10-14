@@ -47,6 +47,12 @@ def reset_scenario(id: str, db: Session = Depends(get_db)):
         # Cascade delete removes child entities
         db.delete(sc)
         db.commit()
+    if id == "scenario_k8s":
+        from app.demo.scenarios_extended import seed_k8s_scenario
+        return seed_k8s_scenario(db, id)
+    elif id == "scenario_ad":
+        from app.demo.scenarios_extended import seed_ad_scenario
+        return seed_ad_scenario(db, id)
     return seed_demo_scenario(db, id)
 
 @router.get("/scenarios/{id}/audit", response_model=List[AuditRecordResponse])
@@ -74,3 +80,42 @@ def get_scenario_benchmark(id: str, db: Session = Depends(get_db)):
     if not scenario:
         raise ScenarioNotFoundError(id)
     return evaluate_scenario_benchmark(db, id)
+
+@router.get("/scenarios/{id}/audit/export")
+def export_audit_trail(id: str, format: str = "json", db: Session = Depends(get_db)):
+    from fastapi.responses import Response
+    import csv, io, datetime, json
+    scenario = ScenarioRepository(db).get_or_seed_demo(id)
+    if not scenario:
+        raise ScenarioNotFoundError(id)
+
+    records = AuditRepository(db).list_by_scenario(id)
+
+    if format.lower() == "csv":
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["record_id", "scenario_id", "action", "input_hash", "output_summary", "timestamp"])
+        for r in records:
+            writer.writerow([r.id, r.scenario_id, r.action, r.input_hash, json.dumps(r.output_summary or {}), r.timestamp.isoformat()])
+        return Response(
+            content=output.getvalue(),
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename={id}_audit_trail.csv"}
+        )
+
+    return {
+        "compliance_standard": "SOC2-CC7.1 / ISO27001-A.12.4 Audit Logging",
+        "scenario_id": id,
+        "exported_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "total_records": len(records),
+        "audit_records": [
+            {
+                "id": r.id,
+                "action": r.action,
+                "input_hash": r.input_hash,
+                "output_summary": r.output_summary,
+                "timestamp": r.timestamp.isoformat()
+            }
+            for r in records
+        ]
+    }

@@ -200,3 +200,107 @@ def test_traceability_principle():
             assert edge["source_id"] == hop["source_id"]
             assert edge["target_id"] == hop["target_id"]
             assert hop["edge_probability"] > 0.0
+
+def test_batch_event_ingestion():
+    batch_payload = [
+        {
+            "event_type": "ssh_probe",
+            "source": "honeyd_sensor",
+            "payload": {"subject_id": "gw_01", "subject_type": "service", "confidence": 0.85, "port": 22}
+        },
+        {
+            "event_type": "privilege_token_minted",
+            "source": "cloudtrail",
+            "payload": {"subject_id": "role_admin", "subject_type": "identity", "confidence": 0.90, "iam": True}
+        }
+    ]
+    res = client.post("/api/v1/scenarios/scenario_demo/events/batch", json=batch_payload)
+    assert res.status_code == 201
+    data = res.json()
+    assert data["total_processed"] == 2
+    assert len(data["events"]) == 2
+
+def test_step_by_step_playback():
+    timeline = [
+        {
+            "event_type": "network_recon",
+            "source": "zeek",
+            "payload": {"subject_id": "gw_01", "subject_type": "service", "confidence": 0.70, "scan": "syn"}
+        },
+        {
+            "event_type": "vault_query_attempt",
+            "source": "db_audit",
+            "payload": {"subject_id": "db_prod", "subject_type": "database", "confidence": 0.95, "query": "SELECT *"}
+        }
+    ]
+    # 1. Load timeline
+    load_res = client.post("/api/v1/scenarios/scenario_demo/playback/load", json=timeline)
+    assert load_res.status_code == 200
+    assert load_res.json()["total_events"] == 2
+
+    # 2. Step 1
+    step1 = client.post("/api/v1/scenarios/scenario_demo/playback/step")
+    assert step1.status_code == 200
+    assert step1.json()["current_step"] == 1
+    assert step1.json()["remaining_events"] == 1
+
+    # 3. Step 2
+    step2 = client.post("/api/v1/scenarios/scenario_demo/playback/step")
+    assert step2.status_code == 200
+    assert step2.json()["current_step"] == 2
+    assert step2.json()["remaining_events"] == 0
+
+    # 4. Status
+    status_res = client.get("/api/v1/scenarios/scenario_demo/playback/status")
+    assert status_res.status_code == 200
+    assert status_res.json()["staged_events_remaining"] == 0
+
+def test_multi_scenario_benchmarks():
+    # Test Kubernetes Microservices Benchmark
+    k8s_res = client.get("/api/v1/scenarios/scenario_k8s/benchmark")
+    assert k8s_res.status_code == 200
+    k8s_data = k8s_res.json()
+    assert k8s_data["benchmark_passed"] is True
+    assert k8s_data["path_recall"] == 1.0
+    assert k8s_data["path_precision"] == 1.0
+    assert k8s_data["decoy_demotion_healthy"] is True
+
+    # Test Active Directory Benchmark
+    ad_res = client.get("/api/v1/scenarios/scenario_ad/benchmark")
+    assert ad_res.status_code == 200
+    ad_data = ad_res.json()
+    assert ad_data["benchmark_passed"] is True
+    assert ad_data["path_recall"] == 1.0
+    assert ad_data["path_precision"] == 1.0
+    assert ad_data["decoy_demotion_healthy"] is True
+
+def test_remediation_code_export():
+    # Export Terraform
+    tf_res = client.post("/api/v1/scenarios/scenario_demo/interventions/int_segment_dmz/export?format=terraform")
+    assert tf_res.status_code == 200
+    assert "resource \"aws_security_group_rule\"" in tf_res.json()["code"]
+    assert tf_res.json()["language"] == "hcl"
+
+    # Export IAM Policy JSON
+    iam_res = client.post("/api/v1/scenarios/scenario_demo/interventions/int_mfa_admin/export?format=iam")
+    assert iam_res.status_code == 200
+    assert "EnforceMFAForAdminRoleAssumption" in iam_res.json()["code"]
+    assert iam_res.json()["language"] == "json"
+
+    # Export Kubernetes NetworkPolicy
+    k8s_res = client.post("/api/v1/scenarios/scenario_demo/interventions/int_segment_dmz/export?format=kubernetes")
+    assert k8s_res.status_code == 200
+    assert "kind: NetworkPolicy" in k8s_res.json()["code"]
+
+def test_audit_trail_export():
+    # Export JSON
+    json_res = client.get("/api/v1/scenarios/scenario_demo/audit/export?format=json")
+    assert json_res.status_code == 200
+    assert "compliance_standard" in json_res.json()
+    assert "audit_records" in json_res.json()
+
+    # Export CSV
+    csv_res = client.get("/api/v1/scenarios/scenario_demo/audit/export?format=csv")
+    assert csv_res.status_code == 200
+    assert "text/csv" in csv_res.headers["content-type"]
+    assert "record_id,scenario_id,action" in csv_res.text

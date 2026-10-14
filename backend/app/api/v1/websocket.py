@@ -41,6 +41,20 @@ manager = ConnectionManager()
 async def broadcast_update(scenario_id: str, message: dict):
     await manager.broadcast(scenario_id, message)
 
+async def broadcast_delta(scenario_id: str, delta_type: str, payload: dict):
+    """
+    Broadcasts compact, typed delta updates for frontend UI state reconciliation.
+    """
+    import datetime
+    message = {
+        "type": "delta",
+        "delta_type": delta_type,
+        "scenario_id": scenario_id,
+        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "payload": payload
+    }
+    await manager.broadcast(scenario_id, message)
+
 @router.websocket("/scenarios/{id}/stream")
 async def websocket_stream(websocket: WebSocket, id: str):
     await manager.connect(id, websocket)
