@@ -1,0 +1,36 @@
+{
+ "edge_composition": {
+  "does_not_exist": 0.225,
+  "exists_and_feasible": 0.537,
+  "exists_not_feasible": 0.237
+ },
+ "errors": [],
+ "event_class_distribution": {
+  "ambiguous": 0.159,
+  "benign": 0.371,
+  "decoy": 0.095,
+  "defensive": 0.101,
+  "other": 0.053,
+  "relevant": 0.222
+ },
+ "events": 11253,
+ "feasible_paths_total": 125,
+ "n_errors": 0,
+ "prior_mean_other_existing_edges": 0.616,
+ "prior_mean_path_edges": 0.597,
+ "s3_observable_edges_min_mean": [
+  4,
+  6.4
+ ],
+ "scenarios": 60,
+ "warnings": [
+  "event_type health_check is 100% one class (benign)",
+  "event_type policy_enforced is 100% one class (defensive)",
+  "event_type admin_login is 98% one class (benign)",
+  "event_type login_failure is 100% one class (ambiguous)",
+  "event_type access_blocked is 100% one class (defensive)",
+  "event_type privilege_change is 100% one class (ambiguous)",
+  "event_type mfa_challenge is 100% one class (defensive)",
+  "event_type connection_denied is 100% one class (defensive)"
+ ]
+}

@@ -1,0 +1,19 @@
+{
+ "DATASET_CARD.md": "d8fff562784065d4ed085edfa876ac22a94a9ca45261298e480209c638c8e1aa",
+ "data/ground_truth/expected_outcomes.jsonl": "e9755e25d88d8820fd49e5a629eaf7ac3227662033dedd30b186f6b470c6da92",
+ "data/ground_truth/ground_truth.jsonl": "4ba3a8718110c84ea9719fec81f9b94ccc0b706f13dc2c747906d3c7137edb38",
+ "data/ground_truth/mapping_annotations.jsonl": "b9ef1695de6153842a974fbd193a4c4a104ed73b7bf69a4ffa7897332b4a0771",
+ "data/ground_truth/normalized_events.jsonl": "500a3a91bd06847af66d4917a26e0434d624e846331d42dc154d1a0879eb1281",
+ "data/ground_truth/scenario_index.jsonl": "3f46bc5e5f17ef522808258e50bfb3337d2dc5abe779493d2e78952f90172b31",
+ "data/ground_truth/template_holdout_splits.json": "eb2db00c6389896e486ccce51ff59c485bfdd79c07795b79d49a87215ec06892",
+ "data/model_input/assets.jsonl": "1da0eb0383c324519f4660489d37070f86af81b12abe9c77a79278a2bdbb3c2d",
+ "data/model_input/events.jsonl": "e6c8939a5d76940982cb85f2c98d7046d2e81504b76b3cb90403f05f402a80b4",
+ "data/model_input/evidence.jsonl": "04a86a1a884841055c63a064ee5d66243c2a47ad798837b4f73e181e79a69f3d",
+ "data/model_input/interventions.jsonl": "daa31801a90d0334eadb6f7d941c50523b44c004bccb2a8a57b883d9e372f580",
+ "data/model_input/relationships.jsonl": "69df9a8886b4cf34f2b8224d6bc662fd81a360ff0085f5303768da889e13ad85",
+ "data/model_input/scenarios.jsonl": "d7797c8c6e3d0500ed9659981268b79783b2f8057069ea3c3b00b1ecf24f7f3b",
+ "data/model_input/what_if.jsonl": "41ecfba60c8eeb2776cfa3b2f91a6ed07e97b61c8a85b8f3df774f636d44dba2",
+ "data/splits.json": "f022204089ff20dcd5ee94fed890a448d55e4023b2addbf6fe6b7bc04da52dd9",
+ "generator_config.json": "7e3bc2cb475b3593c81830e9d71cd73a29dc5784139166818bd13b109c3a6ec3",
+ "manifest.json": "f1b812cdb2c8d7ed55530284d5d27ae9edc43df7ecb151432a32c30fe191bf76"
+}

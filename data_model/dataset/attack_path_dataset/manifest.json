@@ -1,0 +1,27 @@
+{
+ "attack_framework_note": "ATT&CK technique IDs were written from memory and attack_version is UNPINNED. Verify against an official release before citing.",
+ "evaluation_only_dir": "data/ground_truth",
+ "generator_version": "1.0.0",
+ "label_version": "1.0",
+ "master_seed": 20261014,
+ "model_input_dir": "data/model_input",
+ "preset": "standard",
+ "python_version": "3.13",
+ "record_counts": {
+  "assets": 1576,
+  "events": 11253,
+  "evidence": 11253,
+  "gt_expected_outcomes": 80,
+  "gt_ground_truth": 16543,
+  "gt_mapping_annotations": 11253,
+  "gt_normalized_events": 11253,
+  "gt_scenario_index": 60,
+  "interventions": 258,
+  "relationships": 3589,
+  "scenarios": 60,
+  "what_if": 20
+ },
+ "replicas_per_template": 10,
+ "schema_version": "1.0",
+ "synthetic_data_declaration": "All records are synthetic. Names use invented syllables; IPs use RFC 5737 documentation ranges and RFC 1918 space; ASNs use the private-use range; geo codes use ISO user-assigned codes; CVE-like IDs are prefixed SYN-."
+}
