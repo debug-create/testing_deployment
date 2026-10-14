@@ -48,6 +48,7 @@ import {
   Clock,
   BarChart3,
 } from 'lucide-react';
+import { SCENARIO_INTELLIGENCE_CATALOG } from '../data/model_input/loadScenarioIntelligence';
 
 // Dev-only controls flag (hidden from visible product UI by default)
 const SHOW_DEV_CONTROLS = import.meta.env.DEV && import.meta.env.VITE_ENABLE_DEV_RESEED === 'true';
@@ -121,6 +122,9 @@ export function OrgOverview({
     }
     return initialView;
   });
+  const [selectedScenarioId, setSelectedScenarioId] = useState(
+    SCENARIO_INTELLIGENCE_CATALOG.default_scenario_id
+  );
 
   // Audio alert mute toggle state
   const [isAudioMuted, setIsAudioMuted] = useState<boolean>(() => soundEngine.getMuted());
@@ -555,10 +559,10 @@ export function OrgOverview({
 
       {/* 2. Main Content Area */}
       <main className="w-full max-w-[1760px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 py-8 space-y-8">
-        {/* Section 1: Canonical Comparison Strip (Priya, Devraj, Arjun, Neha) */}
+        {/* Section 1: Scenario Intelligence and graph share one model_input scenario. */}
         <ComparisonStrip
-          entities={entities}
-          onSelectCase={handleOpenEntityCase}
+          scenarioId={selectedScenarioId}
+          onScenarioChange={setSelectedScenarioId}
         />
 
         {/* Section 2: Visual Topology / Threat Map Switcher */}
@@ -570,26 +574,12 @@ export function OrgOverview({
                   3D Telemetry Graph & Identity Topology
                 </h3>
                 <p className="text-xs text-zinc-400">
-                  Interactive real-time spatial projection. Rotate with mouse, hover nodes for metrics, and click to inspect case dossiers.
+                  Selected compiler scenario with candidate relationships and raw event context. Rotate, hover, or select nodes and edges to investigate.
                 </p>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-mono text-zinc-400">Department:</span>
-                <select
-                  value={selectedDepartment}
-                  onChange={(e) => setSelectedDepartment(e.target.value)}
-                  className={`py-1 px-2.5 rounded-lg border text-xs font-mono cursor-pointer ${
-                    resolvedTheme === 'dark' ? 'bg-zinc-900 border-white/10 text-zinc-200' : 'bg-white border-zinc-200 text-zinc-800'
-                  }`}
-                >
-                  <option value="all">All Departments</option>
-                  {departments.map((dept) => (
-                    <option key={dept} value={dept}>
-                      {dept}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <span className="px-2.5 py-1 rounded-lg border border-white/10 bg-zinc-900 text-xs font-mono text-zinc-300">
+                Dataset graph: {selectedScenarioId}
+              </span>
             </div>
 
             <Network3DGraph
@@ -600,6 +590,7 @@ export function OrgOverview({
               selectedEntityId={selectedEntityId}
               departmentFilter={selectedDepartment}
               theme={resolvedTheme}
+              scenarioId={selectedScenarioId}
             />
           </div>
         )}

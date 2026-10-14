@@ -1,0 +1,1339 @@
+{
+  "source": "attack_path_dataset/data/model_input",
+  "synthetic_data_declaration": "All records are synthetic.",
+  "default_scenario_id": "scn_0001",
+  "scenarios": [
+    {
+      "scenario_id": "scn_0001",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 168,
+      "asset_count": 35,
+      "relationship_count": 52,
+      "entry_point_count": 2,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001",
+        "external_entry_002"
+      ],
+      "critical_targets": [
+        "db_003"
+      ],
+      "time_window_start": "2026-09-28T00:00:00Z",
+      "time_window_end": "2026-10-03T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 6,
+      "approval_required_count": 5
+    },
+    {
+      "scenario_id": "scn_0002",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 242,
+      "asset_count": 31,
+      "relationship_count": 78,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_002"
+      ],
+      "time_window_start": "2026-09-27T00:00:00Z",
+      "time_window_end": "2026-10-02T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 5,
+      "approval_required_count": 5
+    },
+    {
+      "scenario_id": "scn_0003",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 166,
+      "asset_count": 17,
+      "relationship_count": 48,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_002"
+      ],
+      "time_window_start": "2026-09-20T00:00:00Z",
+      "time_window_end": "2026-09-25T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 3,
+      "approval_required_count": 2
+    },
+    {
+      "scenario_id": "scn_0004",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 227,
+      "asset_count": 30,
+      "relationship_count": 43,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_003"
+      ],
+      "time_window_start": "2026-09-28T00:00:00Z",
+      "time_window_end": "2026-10-03T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 5,
+      "approval_required_count": 4
+    },
+    {
+      "scenario_id": "scn_0005",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 120,
+      "asset_count": 25,
+      "relationship_count": 45,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_002"
+      ],
+      "time_window_start": "2026-09-30T00:00:00Z",
+      "time_window_end": "2026-10-05T00:00:00Z",
+      "source_type_count": 6,
+      "candidate_fix_count": 5,
+      "approval_required_count": 5
+    },
+    {
+      "scenario_id": "scn_0006",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 100,
+      "asset_count": 21,
+      "relationship_count": 36,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_002"
+      ],
+      "time_window_start": "2026-09-30T00:00:00Z",
+      "time_window_end": "2026-10-05T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 3,
+      "approval_required_count": 3
+    },
+    {
+      "scenario_id": "scn_0007",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 250,
+      "asset_count": 40,
+      "relationship_count": 66,
+      "entry_point_count": 2,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001",
+        "external_entry_002"
+      ],
+      "critical_targets": [
+        "db_001"
+      ],
+      "time_window_start": "2026-09-27T00:00:00Z",
+      "time_window_end": "2026-10-02T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 3,
+      "approval_required_count": 2
+    },
+    {
+      "scenario_id": "scn_0008",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 155,
+      "asset_count": 25,
+      "relationship_count": 40,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_002"
+      ],
+      "time_window_start": "2026-09-20T00:00:00Z",
+      "time_window_end": "2026-09-25T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 6,
+      "approval_required_count": 5
+    },
+    {
+      "scenario_id": "scn_0009",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 152,
+      "asset_count": 15,
+      "relationship_count": 47,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_001"
+      ],
+      "time_window_start": "2026-09-23T00:00:00Z",
+      "time_window_end": "2026-09-28T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 3,
+      "approval_required_count": 3
+    },
+    {
+      "scenario_id": "scn_0010",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 216,
+      "asset_count": 30,
+      "relationship_count": 71,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_002"
+      ],
+      "time_window_start": "2026-09-28T00:00:00Z",
+      "time_window_end": "2026-10-03T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 4,
+      "approval_required_count": 1
+    },
+    {
+      "scenario_id": "scn_0011",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 227,
+      "asset_count": 40,
+      "relationship_count": 94,
+      "entry_point_count": 2,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001",
+        "external_entry_002"
+      ],
+      "critical_targets": [
+        "db_002"
+      ],
+      "time_window_start": "2026-09-25T00:00:00Z",
+      "time_window_end": "2026-09-30T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 5,
+      "approval_required_count": 3
+    },
+    {
+      "scenario_id": "scn_0012",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 201,
+      "asset_count": 26,
+      "relationship_count": 72,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_003"
+      ],
+      "time_window_start": "2026-09-29T00:00:00Z",
+      "time_window_end": "2026-10-04T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 5,
+      "approval_required_count": 2
+    },
+    {
+      "scenario_id": "scn_0013",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 136,
+      "asset_count": 22,
+      "relationship_count": 34,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_002"
+      ],
+      "time_window_start": "2026-10-02T00:00:00Z",
+      "time_window_end": "2026-10-07T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 3,
+      "approval_required_count": 2
+    },
+    {
+      "scenario_id": "scn_0014",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 215,
+      "asset_count": 29,
+      "relationship_count": 81,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_002"
+      ],
+      "time_window_start": "2026-09-24T00:00:00Z",
+      "time_window_end": "2026-09-29T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 4,
+      "approval_required_count": 3
+    },
+    {
+      "scenario_id": "scn_0015",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 164,
+      "asset_count": 30,
+      "relationship_count": 72,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_003"
+      ],
+      "time_window_start": "2026-09-20T00:00:00Z",
+      "time_window_end": "2026-09-25T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 6,
+      "approval_required_count": 4
+    },
+    {
+      "scenario_id": "scn_0016",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 294,
+      "asset_count": 39,
+      "relationship_count": 88,
+      "entry_point_count": 2,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001",
+        "external_entry_002"
+      ],
+      "critical_targets": [
+        "db_003"
+      ],
+      "time_window_start": "2026-09-22T00:00:00Z",
+      "time_window_end": "2026-09-27T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 6,
+      "approval_required_count": 3
+    },
+    {
+      "scenario_id": "scn_0017",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 130,
+      "asset_count": 18,
+      "relationship_count": 33,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_002"
+      ],
+      "time_window_start": "2026-09-21T00:00:00Z",
+      "time_window_end": "2026-09-26T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 3,
+      "approval_required_count": 1
+    },
+    {
+      "scenario_id": "scn_0018",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 187,
+      "asset_count": 23,
+      "relationship_count": 51,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_002"
+      ],
+      "time_window_start": "2026-09-26T00:00:00Z",
+      "time_window_end": "2026-10-01T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 3,
+      "approval_required_count": 2
+    },
+    {
+      "scenario_id": "scn_0019",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 300,
+      "asset_count": 29,
+      "relationship_count": 81,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_001"
+      ],
+      "time_window_start": "2026-10-01T00:00:00Z",
+      "time_window_end": "2026-10-06T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 6,
+      "approval_required_count": 5
+    },
+    {
+      "scenario_id": "scn_0020",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 234,
+      "asset_count": 22,
+      "relationship_count": 63,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_002"
+      ],
+      "time_window_start": "2026-09-24T00:00:00Z",
+      "time_window_end": "2026-09-29T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 5,
+      "approval_required_count": 4
+    },
+    {
+      "scenario_id": "scn_0021",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 140,
+      "asset_count": 22,
+      "relationship_count": 37,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_002"
+      ],
+      "time_window_start": "2026-09-24T00:00:00Z",
+      "time_window_end": "2026-09-29T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 4,
+      "approval_required_count": 3
+    },
+    {
+      "scenario_id": "scn_0022",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 243,
+      "asset_count": 36,
+      "relationship_count": 80,
+      "entry_point_count": 2,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001",
+        "external_entry_002"
+      ],
+      "critical_targets": [
+        "db_002"
+      ],
+      "time_window_start": "2026-09-25T00:00:00Z",
+      "time_window_end": "2026-09-30T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 6,
+      "approval_required_count": 2
+    },
+    {
+      "scenario_id": "scn_0023",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 159,
+      "asset_count": 32,
+      "relationship_count": 40,
+      "entry_point_count": 2,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001",
+        "external_entry_002"
+      ],
+      "critical_targets": [
+        "db_001"
+      ],
+      "time_window_start": "2026-09-22T00:00:00Z",
+      "time_window_end": "2026-09-27T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 4,
+      "approval_required_count": 3
+    },
+    {
+      "scenario_id": "scn_0024",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 245,
+      "asset_count": 31,
+      "relationship_count": 68,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_001"
+      ],
+      "time_window_start": "2026-09-28T00:00:00Z",
+      "time_window_end": "2026-10-03T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 6,
+      "approval_required_count": 6
+    },
+    {
+      "scenario_id": "scn_0025",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 190,
+      "asset_count": 34,
+      "relationship_count": 65,
+      "entry_point_count": 2,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001",
+        "external_entry_002"
+      ],
+      "critical_targets": [
+        "db_001"
+      ],
+      "time_window_start": "2026-09-24T00:00:00Z",
+      "time_window_end": "2026-09-29T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 5,
+      "approval_required_count": 4
+    },
+    {
+      "scenario_id": "scn_0026",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 238,
+      "asset_count": 25,
+      "relationship_count": 97,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_001"
+      ],
+      "time_window_start": "2026-09-24T00:00:00Z",
+      "time_window_end": "2026-09-29T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 4,
+      "approval_required_count": 3
+    },
+    {
+      "scenario_id": "scn_0027",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 198,
+      "asset_count": 26,
+      "relationship_count": 44,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_002"
+      ],
+      "time_window_start": "2026-09-22T00:00:00Z",
+      "time_window_end": "2026-09-27T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 4,
+      "approval_required_count": 3
+    },
+    {
+      "scenario_id": "scn_0028",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 231,
+      "asset_count": 34,
+      "relationship_count": 70,
+      "entry_point_count": 2,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001",
+        "external_entry_002"
+      ],
+      "critical_targets": [
+        "db_001"
+      ],
+      "time_window_start": "2026-09-21T00:00:00Z",
+      "time_window_end": "2026-09-26T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 3,
+      "approval_required_count": 2
+    },
+    {
+      "scenario_id": "scn_0029",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 143,
+      "asset_count": 24,
+      "relationship_count": 38,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_001"
+      ],
+      "time_window_start": "2026-09-28T00:00:00Z",
+      "time_window_end": "2026-10-03T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 3,
+      "approval_required_count": 2
+    },
+    {
+      "scenario_id": "scn_0030",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 105,
+      "asset_count": 23,
+      "relationship_count": 49,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_001"
+      ],
+      "time_window_start": "2026-10-02T00:00:00Z",
+      "time_window_end": "2026-10-07T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 3,
+      "approval_required_count": 0
+    },
+    {
+      "scenario_id": "scn_0031",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 156,
+      "asset_count": 35,
+      "relationship_count": 73,
+      "entry_point_count": 2,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001",
+        "external_entry_002"
+      ],
+      "critical_targets": [
+        "db_002"
+      ],
+      "time_window_start": "2026-10-01T00:00:00Z",
+      "time_window_end": "2026-10-06T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 6,
+      "approval_required_count": 4
+    },
+    {
+      "scenario_id": "scn_0032",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 249,
+      "asset_count": 33,
+      "relationship_count": 66,
+      "entry_point_count": 2,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001",
+        "external_entry_002"
+      ],
+      "critical_targets": [
+        "db_003"
+      ],
+      "time_window_start": "2026-09-21T00:00:00Z",
+      "time_window_end": "2026-09-26T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 5,
+      "approval_required_count": 4
+    },
+    {
+      "scenario_id": "scn_0033",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 243,
+      "asset_count": 20,
+      "relationship_count": 56,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_002"
+      ],
+      "time_window_start": "2026-09-22T00:00:00Z",
+      "time_window_end": "2026-09-27T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 5,
+      "approval_required_count": 3
+    },
+    {
+      "scenario_id": "scn_0034",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 101,
+      "asset_count": 15,
+      "relationship_count": 45,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_001"
+      ],
+      "time_window_start": "2026-09-25T00:00:00Z",
+      "time_window_end": "2026-09-30T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 3,
+      "approval_required_count": 1
+    },
+    {
+      "scenario_id": "scn_0035",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 253,
+      "asset_count": 26,
+      "relationship_count": 96,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_001"
+      ],
+      "time_window_start": "2026-09-27T00:00:00Z",
+      "time_window_end": "2026-10-02T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 6,
+      "approval_required_count": 3
+    },
+    {
+      "scenario_id": "scn_0036",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 276,
+      "asset_count": 28,
+      "relationship_count": 56,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_001"
+      ],
+      "time_window_start": "2026-09-27T00:00:00Z",
+      "time_window_end": "2026-10-02T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 5,
+      "approval_required_count": 3
+    },
+    {
+      "scenario_id": "scn_0037",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 118,
+      "asset_count": 24,
+      "relationship_count": 38,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_001"
+      ],
+      "time_window_start": "2026-09-30T00:00:00Z",
+      "time_window_end": "2026-10-05T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 4,
+      "approval_required_count": 3
+    },
+    {
+      "scenario_id": "scn_0038",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 254,
+      "asset_count": 30,
+      "relationship_count": 71,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_003"
+      ],
+      "time_window_start": "2026-09-27T00:00:00Z",
+      "time_window_end": "2026-10-02T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 5,
+      "approval_required_count": 2
+    },
+    {
+      "scenario_id": "scn_0039",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 120,
+      "asset_count": 15,
+      "relationship_count": 38,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_001"
+      ],
+      "time_window_start": "2026-09-20T00:00:00Z",
+      "time_window_end": "2026-09-25T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 5,
+      "approval_required_count": 3
+    },
+    {
+      "scenario_id": "scn_0040",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 299,
+      "asset_count": 25,
+      "relationship_count": 73,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_001"
+      ],
+      "time_window_start": "2026-10-01T00:00:00Z",
+      "time_window_end": "2026-10-06T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 5,
+      "approval_required_count": 4
+    },
+    {
+      "scenario_id": "scn_0041",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 149,
+      "asset_count": 16,
+      "relationship_count": 30,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_001"
+      ],
+      "time_window_start": "2026-09-26T00:00:00Z",
+      "time_window_end": "2026-10-01T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 3,
+      "approval_required_count": 2
+    },
+    {
+      "scenario_id": "scn_0042",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 119,
+      "asset_count": 17,
+      "relationship_count": 51,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_001"
+      ],
+      "time_window_start": "2026-09-27T00:00:00Z",
+      "time_window_end": "2026-10-02T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 3,
+      "approval_required_count": 1
+    },
+    {
+      "scenario_id": "scn_0043",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 105,
+      "asset_count": 24,
+      "relationship_count": 34,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_002"
+      ],
+      "time_window_start": "2026-09-23T00:00:00Z",
+      "time_window_end": "2026-09-28T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 5,
+      "approval_required_count": 3
+    },
+    {
+      "scenario_id": "scn_0044",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 184,
+      "asset_count": 22,
+      "relationship_count": 73,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_002"
+      ],
+      "time_window_start": "2026-09-20T00:00:00Z",
+      "time_window_end": "2026-09-25T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 3,
+      "approval_required_count": 2
+    },
+    {
+      "scenario_id": "scn_0045",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 154,
+      "asset_count": 25,
+      "relationship_count": 44,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_001"
+      ],
+      "time_window_start": "2026-09-27T00:00:00Z",
+      "time_window_end": "2026-10-02T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 4,
+      "approval_required_count": 2
+    },
+    {
+      "scenario_id": "scn_0046",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 125,
+      "asset_count": 21,
+      "relationship_count": 37,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_001"
+      ],
+      "time_window_start": "2026-09-26T00:00:00Z",
+      "time_window_end": "2026-10-01T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 3,
+      "approval_required_count": 3
+    },
+    {
+      "scenario_id": "scn_0047",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 195,
+      "asset_count": 32,
+      "relationship_count": 97,
+      "entry_point_count": 2,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001",
+        "external_entry_002"
+      ],
+      "critical_targets": [
+        "db_001"
+      ],
+      "time_window_start": "2026-09-20T00:00:00Z",
+      "time_window_end": "2026-09-25T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 6,
+      "approval_required_count": 2
+    },
+    {
+      "scenario_id": "scn_0048",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 128,
+      "asset_count": 24,
+      "relationship_count": 38,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_001"
+      ],
+      "time_window_start": "2026-09-22T00:00:00Z",
+      "time_window_end": "2026-09-27T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 3,
+      "approval_required_count": 2
+    },
+    {
+      "scenario_id": "scn_0049",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 169,
+      "asset_count": 20,
+      "relationship_count": 57,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_002"
+      ],
+      "time_window_start": "2026-09-26T00:00:00Z",
+      "time_window_end": "2026-10-01T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 5,
+      "approval_required_count": 4
+    },
+    {
+      "scenario_id": "scn_0050",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 230,
+      "asset_count": 26,
+      "relationship_count": 68,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_002"
+      ],
+      "time_window_start": "2026-10-02T00:00:00Z",
+      "time_window_end": "2026-10-07T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 3,
+      "approval_required_count": 3
+    },
+    {
+      "scenario_id": "scn_0051",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 225,
+      "asset_count": 37,
+      "relationship_count": 78,
+      "entry_point_count": 2,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001",
+        "external_entry_002"
+      ],
+      "critical_targets": [
+        "db_003"
+      ],
+      "time_window_start": "2026-09-29T00:00:00Z",
+      "time_window_end": "2026-10-04T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 5,
+      "approval_required_count": 5
+    },
+    {
+      "scenario_id": "scn_0052",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 111,
+      "asset_count": 16,
+      "relationship_count": 48,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_001"
+      ],
+      "time_window_start": "2026-09-20T00:00:00Z",
+      "time_window_end": "2026-09-25T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 5,
+      "approval_required_count": 3
+    },
+    {
+      "scenario_id": "scn_0053",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 195,
+      "asset_count": 31,
+      "relationship_count": 68,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_003"
+      ],
+      "time_window_start": "2026-09-20T00:00:00Z",
+      "time_window_end": "2026-09-25T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 3,
+      "approval_required_count": 2
+    },
+    {
+      "scenario_id": "scn_0054",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 116,
+      "asset_count": 18,
+      "relationship_count": 30,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_002"
+      ],
+      "time_window_start": "2026-10-02T00:00:00Z",
+      "time_window_end": "2026-10-07T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 3,
+      "approval_required_count": 2
+    },
+    {
+      "scenario_id": "scn_0055",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 152,
+      "asset_count": 20,
+      "relationship_count": 54,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_001"
+      ],
+      "time_window_start": "2026-09-30T00:00:00Z",
+      "time_window_end": "2026-10-05T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 4,
+      "approval_required_count": 3
+    },
+    {
+      "scenario_id": "scn_0056",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 294,
+      "asset_count": 30,
+      "relationship_count": 98,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_003"
+      ],
+      "time_window_start": "2026-09-28T00:00:00Z",
+      "time_window_end": "2026-10-03T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 5,
+      "approval_required_count": 1
+    },
+    {
+      "scenario_id": "scn_0057",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 191,
+      "asset_count": 30,
+      "relationship_count": 72,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_003"
+      ],
+      "time_window_start": "2026-09-30T00:00:00Z",
+      "time_window_end": "2026-10-05T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 3,
+      "approval_required_count": 2
+    },
+    {
+      "scenario_id": "scn_0058",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 227,
+      "asset_count": 31,
+      "relationship_count": 88,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_002"
+      ],
+      "time_window_start": "2026-09-23T00:00:00Z",
+      "time_window_end": "2026-09-28T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 3,
+      "approval_required_count": 3
+    },
+    {
+      "scenario_id": "scn_0059",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 183,
+      "asset_count": 30,
+      "relationship_count": 86,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_003"
+      ],
+      "time_window_start": "2026-09-30T00:00:00Z",
+      "time_window_end": "2026-10-05T00:00:00Z",
+      "source_type_count": 7,
+      "candidate_fix_count": 6,
+      "approval_required_count": 6
+    },
+    {
+      "scenario_id": "scn_0060",
+      "synthetic": true,
+      "schema_version": "1.0",
+      "graph_version": "v1_baseline",
+      "event_count": 156,
+      "asset_count": 21,
+      "relationship_count": 43,
+      "entry_point_count": 1,
+      "critical_target_count": 1,
+      "entry_points": [
+        "external_entry_001"
+      ],
+      "critical_targets": [
+        "db_001"
+      ],
+      "time_window_start": "2026-09-30T00:00:00Z",
+      "time_window_end": "2026-10-05T00:00:00Z",
+      "source_type_count": 6,
+      "candidate_fix_count": 3,
+      "approval_required_count": 2
+    }
+  ]
+}

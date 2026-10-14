@@ -2,34 +2,30 @@
 // High-polish 3D Force-Directed Telemetry Starburst Graph
 // Native WebGL Glow & Additive Bloom with Full React 19 Compatibility
 //
-// Key Capabilities:
-// - Renders the FULL organizational roster (~18-20 entities) across Core Infrastructure, Data & Analytics, Security Ops, Frontend, Product, and Finance & Legal.
-// - Departmental sector grouping inside the radiant core constellation mesh.
-// - Radial displacement directly proportional to Residual Risk (Contract v2.0.0 / v2.4.1):
-//   * Dense calm baseline core (residual <= 25, ~14-15 entities).
-//   * Minor elevated blips (residual 28-32, e.g. Kavita, Chen) sit just outside the core with mild outward force.
-//   * Devraj (residual 98.4, fully unexplained) is an isolated high-risk red outlier at the tip of the elongated Singapore branch.
-//   * Arjun (residual 42, partially explained) sits on an amber mid-branch.
-//   * Priya (residual 25, coverage 100%) sits firmly in the calm green core.
-//   * Neha (residual 25, indeterminate) sits on the boundary ring in glowing cyan.
-// - Multi-tier glowing curved bezier edges with animated data pulses and additive bloom rendering.
-// - Generous hit-testing and universal click navigation to Case Detail pages.
+// Key capabilities:
+// - Loads the selected Attack Path Compiler model_input scenario on demand.
+// - Renders only supplied assets and candidate relationships; no synthetic graph links are added.
+// - Uses evidence basis and prior probability for deliberately restrained edge treatment.
+// - Resolves raw event aliases only when an identifier or alias maps uniquely.
+// - Preserves the existing WebGL renderer, orbit controls, projected labels, and selection model.
 
 import React, { useRef, useState, useMemo, useEffect } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { Entity } from '../types';
-import {
-  RotateCcw,
-  RefreshCw,
-  ArrowUpRight,
-  Sparkles,
-  ShieldAlert,
-  ShieldCheck,
-  AlertTriangle,
-} from 'lucide-react';
+import { Play, RotateCcw, RefreshCw, ShieldCheck } from 'lucide-react';
 import { PersonaAvatar } from './PersonaAvatar';
+import {
+  formatScenarioAssetName,
+  formatScenarioTimestamp,
+  loadScenarioGraphData,
+  RelationshipEvidenceBasis,
+  ScenarioAssetType,
+  ScenarioGraphAsset,
+  ScenarioGraphData,
+  ScenarioGraphEvent,
+} from '../data/model_input/loadScenarioIntelligence';
 
 // Dev-only controls flag (hidden from visible product UI by default)
 const SHOW_DEV_CONTROLS = import.meta.env.DEV && import.meta.env.VITE_ENABLE_DEV_RESEED === 'true';
@@ -42,6 +38,7 @@ interface Network3DGraphProps {
   selectedEntityId?: string | null;
   departmentFilter?: string;
   theme?: 'dark' | 'light';
+  scenarioId: string;
 }
 
 export interface SimNode {
@@ -63,6 +60,14 @@ export interface SimNode {
   branchAngle: number;
   isSyntheticNode?: boolean;
   isCoreHub?: boolean;
+  assetType: ScenarioAssetType;
+  asset: ScenarioGraphAsset;
+  isIdentity: boolean;
+  isEntryPoint: boolean;
+  isCriticalTarget: boolean;
+  connectedEdgeIds: string[];
+  events: ScenarioGraphEvent[];
+  investigationEvents: ScenarioGraphEvent[];
 }
 
 export interface SimEdge {
@@ -77,7 +82,13 @@ export interface SimEdge {
   pulseSpeed?: number;
   pulseColor?: string;
   lineWidth?: number;
+  relationshipType: string;
+  evidenceBasis: RelationshipEvidenceBasis;
+  priorProbability: number;
+  events: ScenarioGraphEvent[];
 }
+
+type SimulationPhase = 'idle' | 'telemetry' | 'anomaly' | 'tracking' | 'contained';
 
 // Fixed seed random generator for 100% deterministic layout
 function pseudoRandom(seed: number) {
@@ -106,476 +117,237 @@ function createGlowTexture(color: string): THREE.CanvasTexture {
   return texture;
 }
 
-// Department cluster angles (radians in XZ plane)
-const DEPT_ANGLES: Record<string, number> = {
-  'Core Infrastructure': 0.0, // 0 deg
-  Frontend: 1.05, // 60 deg
-  Product: 2.09, // 120 deg
-  'Data & Analytics': 3.14, // 180 deg
-  'Security Ops': 4.19, // 240 deg
-  'Finance & Legal': 5.24, // 300 deg
+const IDENTITY_TYPES = new Set<ScenarioAssetType>([
+  'user_identity',
+  'privileged_identity',
+  'cloud_identity',
+]);
+
+const INVESTIGATION_EVENT_TYPES = new Set([
+  'authentication_anomaly',
+  'suspicious_process',
+  'malware_detected',
+  'secret_exposure_detected',
+  'sensitive_resource_access',
+  'unusual_request_rate',
+  'privilege_change',
+  'port_exposure_change',
+  'service_exposed',
+  'vulnerability_detected',
+  'login_failure',
+]);
+
+const ASSET_STYLE: Record<ScenarioAssetType, { color: string; glow: string; size: number }> = {
+  user_identity: { color: '#38BDF8', glow: '#0EA5E9', size: 0.52 },
+  privileged_identity: { color: '#C084FC', glow: '#A855F7', size: 0.6 },
+  cloud_identity: { color: '#67E8F9', glow: '#06B6D4', size: 0.52 },
+  endpoint: { color: '#34D399', glow: '#10B981', size: 0.43 },
+  application: { color: '#FBBF24', glow: '#F59E0B', size: 0.45 },
+  server: { color: '#94A3B8', glow: '#64748B', size: 0.46 },
+  database: { color: '#FB7185', glow: '#E11D48', size: 0.5 },
+  security_infrastructure: { color: '#818CF8', glow: '#6366F1', size: 0.48 },
+  external_entry: { color: '#F97316', glow: '#EA580C', size: 0.52 },
 };
 
-// Department theme colors
-const DEPT_COLORS: Record<string, { color: string; glow: string }> = {
-  'Core Infrastructure': { color: '#38BDF8', glow: '#0284C7' },
-  'Data & Analytics': { color: '#A78BFA', glow: '#7C3AED' },
-  'Security Ops': { color: '#F43F5E', glow: '#E11D48' },
-  Frontend: { color: '#34D399', glow: '#059669' },
-  Product: { color: '#FBBF24', glow: '#D97706' },
-  'Finance & Legal': { color: '#94A3B8', glow: '#475569' },
+const EVIDENCE_STYLE: Record<RelationshipEvidenceBasis, { color: string; glow: string; opacity: number }> = {
+  configured: { color: '#7DD3FC', glow: '#38BDF8', opacity: 0.72 },
+  inferred: { color: '#C4B5FD', glow: '#8B5CF6', opacity: 0.52 },
+  weak: { color: '#FCD34D', glow: '#D97706', opacity: 0.36 },
+  unsupported: { color: '#71717A', glow: '#52525B', opacity: 0.2 },
 };
 
-// ----------------------------------------------------------------------------
-// Physics Simulation Engine with Full Roster & Starburst Constellation
-// ----------------------------------------------------------------------------
-function computeForceLayout(
-  entities: Entity[],
-  departmentFilter: string
-): { nodes: SimNode[]; edges: SimEdge[] } {
-  const filtered =
-    departmentFilter === 'all'
-      ? entities
-      : entities.filter((e) => e.department === departmentFilter);
+function hashString(value: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return Math.abs(hash >>> 0);
+}
 
-  const nodes: SimNode[] = [];
-  const edges: SimEdge[] = [];
-  const nodeMap = new Map<string, SimNode>();
+function normalizeAlias(value?: string): string {
+  return (value || '').trim().toLowerCase();
+}
 
-  // 1. Central Radiant Core Hub (The Luminous Sun Anchor)
-  const sunHub: SimNode = {
-    id: 'center_starburst_hub',
-    name: 'IKORI Ingestion Mesh',
-    role: 'Root Telemetry Ingestion Hub',
-    department: 'Core Infrastructure',
-    residualRisk: 0,
-    rawScore: 0,
-    coverage: 100,
-    caseStatus: 'Normal Baseline',
-    statusType: 'core_hub',
-    pos: new THREE.Vector3(0, 0, 0),
-    vel: new THREE.Vector3(0, 0, 0),
-    size: 0.85,
-    color: '#E0F2FE',
-    glowColor: '#38BDF8',
-    isOutlier: false,
-    branchAngle: 0,
-    isSyntheticNode: true,
-    isCoreHub: true,
+function buildEventResolution(data: ScenarioGraphData) {
+  const assetIds = new Set(data.assets.map((asset) => asset.asset_id));
+  const aliasCandidates = new Map<string, Set<string>>();
+
+  data.assets.forEach((asset) => {
+    [asset.display_name, asset.email, asset.hostname, asset.ip_address].forEach((alias) => {
+      const normalized = normalizeAlias(alias);
+      if (!normalized) return;
+      const candidates = aliasCandidates.get(normalized) || new Set<string>();
+      candidates.add(asset.asset_id);
+      aliasCandidates.set(normalized, candidates);
+    });
+  });
+
+  const resolve = (raw?: string): string | null => {
+    if (!raw) return null;
+    if (assetIds.has(raw)) return raw;
+    const matches = aliasCandidates.get(normalizeAlias(raw));
+    return matches?.size === 1 ? [...matches][0] : null;
   };
-  nodes.push(sunHub);
-  nodeMap.set(sunHub.id, sunHub);
 
-  // 2. Departmental Sector Hub Anchors inside Core Cluster
-  const X_STRETCH = 2.15;
-  const hubDist = 6.2;
+  return data.events.map((event) => ({
+    event,
+    sourceId: resolve(event.source_entity_raw),
+    targetId: resolve(event.target_entity_raw),
+  }));
+}
 
-  const deptHubs = [
-    { id: 'hub_infra', name: 'Bastion & IAM Relay', dept: 'Core Infrastructure', angle: DEPT_ANGLES['Core Infrastructure'] },
-    { id: 'hub_frontend', name: 'UI & Gateway Hub', dept: 'Frontend', angle: DEPT_ANGLES['Frontend'] },
-    { id: 'hub_product', name: 'Product Analytics Relay', dept: 'Product', angle: DEPT_ANGLES['Product'] },
-    { id: 'hub_data', name: 'Data Pipeline Hub', dept: 'Data & Analytics', angle: DEPT_ANGLES['Data & Analytics'] },
-    { id: 'hub_secops', name: 'SIEM Correlation Grid', dept: 'Security Ops', angle: DEPT_ANGLES['Security Ops'] },
-    { id: 'hub_finlegal', name: 'Audit & Compliance Mesh', dept: 'Finance & Legal', angle: DEPT_ANGLES['Finance & Legal'] },
+function computeForceLayout(data: ScenarioGraphData): { nodes: SimNode[]; edges: SimEdge[]; unresolvedAliases: number } {
+  const resolvedEvents = buildEventResolution(data);
+  const assetById = new Map(data.assets.map((asset) => [asset.asset_id, asset]));
+  const relationshipsByNode = new Map<string, string[]>();
+  const eventsByNode = new Map<string, ScenarioGraphEvent[]>();
+
+  resolvedEvents.forEach(({ event, sourceId, targetId }) => {
+    [sourceId, targetId].forEach((assetId) => {
+      if (!assetId) return;
+      const list = eventsByNode.get(assetId) || [];
+      list.push(event);
+      eventsByNode.set(assetId, list);
+    });
+  });
+
+  data.relationships.forEach((relationship) => {
+    [relationship.source_id, relationship.target_id].forEach((assetId) => {
+      const list = relationshipsByNode.get(assetId) || [];
+      list.push(relationship.edge_id);
+      relationshipsByNode.set(assetId, list);
+    });
+  });
+
+  const nodes: SimNode[] = data.assets.map((asset, index) => {
+    const style = ASSET_STYLE[asset.asset_type];
+    const seed = hashString(`${data.scenario_id}:${asset.asset_id}`);
+    const angle = (index / Math.max(1, data.assets.length)) * Math.PI * 2 + pseudoRandom(seed) * 0.7;
+    const radius = 4.5 + (index % 5) * 0.9 + pseudoRandom(seed + 13) * 1.8;
+    const events = eventsByNode.get(asset.asset_id) || [];
+    const isEntryPoint = data.entry_points.includes(asset.asset_id);
+    const isCriticalTarget = data.critical_targets.includes(asset.asset_id);
+    return {
+      id: asset.asset_id,
+      name: formatScenarioAssetName(asset),
+      role: asset.asset_type.replaceAll('_', ' '),
+      department: asset.zone,
+      residualRisk: 0,
+      rawScore: 0,
+      coverage: Math.round(asset.evidence_coverage * 100),
+      caseStatus: 'Candidate graph entity',
+      statusType: isEntryPoint ? 'elevated' : isCriticalTarget ? 'hold' : IDENTITY_TYPES.has(asset.asset_type) ? 'cleared' : 'baseline',
+      pos: new THREE.Vector3(
+        Math.cos(angle) * radius * 1.35,
+        (pseudoRandom(seed + 29) - 0.5) * 2.2,
+        Math.sin(angle) * radius,
+      ),
+      vel: new THREE.Vector3(),
+      size: style.size + asset.criticality * 0.025,
+      color: style.color,
+      glowColor: style.glow,
+      isOutlier: isEntryPoint,
+      branchAngle: angle,
+      assetType: asset.asset_type,
+      asset,
+      isIdentity: IDENTITY_TYPES.has(asset.asset_type),
+      isEntryPoint,
+      isCriticalTarget,
+      connectedEdgeIds: relationshipsByNode.get(asset.asset_id) || [],
+      events,
+      investigationEvents: events.filter((event) => INVESTIGATION_EVENT_TYPES.has(event.event_type)),
+    };
+  });
+
+  const nodeById = new Map(nodes.map((node) => [node.id, node]));
+  const edges: SimEdge[] = data.relationships
+    .filter((relationship) => nodeById.has(relationship.source_id) && nodeById.has(relationship.target_id))
+    .map((relationship) => {
+      const style = EVIDENCE_STYLE[relationship.evidence_basis];
+      const matchingEvents = resolvedEvents
+        .filter(({ sourceId, targetId }) => sourceId === relationship.source_id && targetId === relationship.target_id)
+        .map(({ event }) => event);
+      return {
+        id: relationship.edge_id,
+        source: relationship.source_id,
+        target: relationship.target_id,
+        statusType: 'baseline',
+        color: style.color,
+        glowColor: style.glow,
+        curveElevation: (pseudoRandom(hashString(relationship.edge_id)) - 0.5) * 1.5,
+        lineWidth: 0.7 + relationship.prior_probability * 1.4,
+        relationshipType: relationship.relationship_type,
+        evidenceBasis: relationship.evidence_basis,
+        priorProbability: relationship.prior_probability,
+        events: matchingEvents,
+      };
+    });
+
+  for (let step = 0; step < 300; step += 1) {
+    const temperature = 1 - step / 300;
+    for (let left = 0; left < nodes.length; left += 1) {
+      for (let right = left + 1; right < nodes.length; right += 1) {
+        const delta = nodes[left].pos.clone().sub(nodes[right].pos);
+        const distanceSquared = Math.max(0.3, delta.lengthSq());
+        const force = (11 / distanceSquared) * temperature;
+        delta.normalize().multiplyScalar(force);
+        nodes[left].vel.add(delta);
+        nodes[right].vel.sub(delta);
+      }
+    }
+
+    edges.forEach((edge) => {
+      const source = nodeById.get(edge.source)!;
+      const target = nodeById.get(edge.target)!;
+      const delta = target.pos.clone().sub(source.pos);
+      const distance = Math.max(0.1, delta.length());
+      const desired = 4.1 + (1 - edge.priorProbability) * 1.8;
+      const force = (distance - desired) * 0.03 * temperature;
+      delta.normalize().multiplyScalar(force);
+      source.vel.add(delta);
+      target.vel.sub(delta);
+    });
+
+    nodes.forEach((node) => {
+      node.vel.add(node.pos.clone().multiplyScalar(-0.0045 * temperature));
+      node.pos.add(node.vel.clone().multiplyScalar(0.45));
+      node.vel.multiplyScalar(0.6);
+      node.pos.y *= 0.992;
+    });
+  }
+
+  const box = new THREE.Box3().setFromPoints(nodes.map((node) => node.pos));
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  nodes.forEach((node) => {
+    node.pos.sub(center);
+    node.pos.x *= 40 / Math.max(size.x, 1);
+    node.pos.z *= 22 / Math.max(size.z, 1);
+    node.pos.y *= 8 / Math.max(size.y, 1);
+  });
+
+  const unresolvedAliases = resolvedEvents.filter(
+    ({ event, sourceId, targetId }) =>
+      (event.source_entity_raw && !sourceId) || (event.target_entity_raw && !targetId)
+  ).length;
+
+  return { nodes, edges, unresolvedAliases };
+}
+
+function chooseSimulationRoute(edges: SimEdge[], nodes: SimNode[]): SimEdge[] {
+  if (edges.length === 0) return [];
+  const entryIds = new Set(nodes.filter((node) => node.isEntryPoint).map((node) => node.id));
+  const orderedStarts = [
+    ...edges.filter((edge) => entryIds.has(edge.source)),
+    ...edges.filter((edge) => !entryIds.has(edge.source)),
   ];
 
-  deptHubs.forEach((hub, i) => {
-    const hubNode: SimNode = {
-      id: hub.id,
-      name: hub.name,
-      role: 'Internal Sector Mesh',
-      department: hub.dept,
-      residualRisk: 4,
-      rawScore: 5,
-      coverage: 100,
-      caseStatus: 'Operational',
-      statusType: 'baseline',
-      pos: new THREE.Vector3(
-        Math.cos(hub.angle) * hubDist * X_STRETCH,
-        (pseudoRandom(i * 11) - 0.5) * 0.5,
-        Math.sin(hub.angle) * hubDist * 0.85
-      ),
-      vel: new THREE.Vector3(0, 0, 0),
-      size: 0.38,
-      color: DEPT_COLORS[hub.dept]?.color || '#38BDF8',
-      glowColor: DEPT_COLORS[hub.dept]?.glow || '#0284C7',
-      isOutlier: false,
-      branchAngle: hub.angle,
-      isSyntheticNode: true,
-    };
-    nodes.push(hubNode);
-    nodeMap.set(hubNode.id, hubNode);
-
-    // Radiate from Center Sun to Dept Hubs
-    edges.push({
-      id: `edge-sun-${hub.id}`,
-      source: sunHub.id,
-      target: hub.id,
-      statusType: 'baseline',
-      color: DEPT_COLORS[hub.dept]?.color || '#38BDF8',
-      glowColor: DEPT_COLORS[hub.dept]?.glow || '#0EA5E9',
-      curveElevation: 0.15,
-      lineWidth: 2,
-    });
-  });
-
-  // 3. Connect Inter-Department Mesh Ring for Structural Integrity
-  for (let i = 0; i < deptHubs.length; i++) {
-    const nextIdx = (i + 1) % deptHubs.length;
-    edges.push({
-      id: `edge-dept-ring-${i}`,
-      source: deptHubs[i].id,
-      target: deptHubs[nextIdx].id,
-      statusType: 'baseline',
-      color: '#38BDF833',
-      glowColor: '#0284C722',
-      curveElevation: 0.1,
-      lineWidth: 1,
-    });
+  for (const first of orderedStarts) {
+    const second = edges.find((edge) => edge.source === first.target && edge.id !== first.id);
+    if (second) return [first, second];
   }
-
-  // 4. Outlier Exfiltration Staging / Bridge Nodes
-  // Devraj's Singapore Exfiltration Relays (creating the long isolated tree branch on right wing)
-  const devrajRelay1: SimNode = {
-    id: 'branch_devraj_sg_gw',
-    name: 'Singapore Transit Gateway',
-    role: 'Unregistered Ingress ASN',
-    department: 'Core Infrastructure',
-    residualRisk: 88,
-    rawScore: 92,
-    coverage: 0,
-    caseStatus: 'Flagged',
-    statusType: 'escalated',
-    pos: new THREE.Vector3(16.5, 0.9, 2.8),
-    vel: new THREE.Vector3(0, 0, 0),
-    size: 0.34,
-    color: '#FF3B30',
-    glowColor: '#E8342A',
-    isOutlier: true,
-    branchAngle: 0.25,
-    isSyntheticNode: true,
-  };
-  nodes.push(devrajRelay1);
-  nodeMap.set(devrajRelay1.id, devrajRelay1);
-
-  const devrajRelay2: SimNode = {
-    id: 'branch_devraj_vault_dump',
-    name: 'Vault Key Export Pipe',
-    role: 'Exfiltration Channel',
-    department: 'Core Infrastructure',
-    residualRisk: 96,
-    rawScore: 98,
-    coverage: 0,
-    caseStatus: 'Active Breach Stage',
-    statusType: 'escalated',
-    pos: new THREE.Vector3(23.5, 1.5, 4.2),
-    vel: new THREE.Vector3(0, 0, 0),
-    size: 0.38,
-    color: '#FF3B30',
-    glowColor: '#FF2A1A',
-    isOutlier: true,
-    branchAngle: 0.25,
-    isSyntheticNode: true,
-  };
-  nodes.push(devrajRelay2);
-  nodeMap.set(devrajRelay2.id, devrajRelay2);
-
-  // Arjun's Migration Bridge (Amber Mid-Branch on left wing)
-  const arjunBridge: SimNode = {
-    id: 'branch_arjun_migration_bridge',
-    name: 'Snowflake Migration Relay',
-    role: 'Partial Context Resource',
-    department: 'Data & Analytics',
-    residualRisk: 46,
-    rawScore: 100,
-    coverage: 59,
-    caseStatus: 'Hold Active',
-    statusType: 'hold',
-    pos: new THREE.Vector3(-16.0, 0.8, -2.2),
-    vel: new THREE.Vector3(0, 0, 0),
-    size: 0.34,
-    color: '#F59E0B',
-    glowColor: '#FBBF24',
-    isOutlier: true,
-    branchAngle: 3.14,
-    isSyntheticNode: true,
-  };
-  nodes.push(arjunBridge);
-  nodeMap.set(arjunBridge.id, arjunBridge);
-
-  // 5. Full Roster Entities Layout & Positioning
-  // Group entities by department to apply sector offsets
-  const deptEntityCounts: Record<string, number> = {};
-
-  filtered.forEach((ent, idx) => {
-    const isDevraj = ent.id.includes('devraj') || ent.caseId === '104';
-    const isPriya = ent.id.includes('priya') || ent.caseId === '101';
-    const isArjun = ent.id.includes('arjun') || ent.caseId === '107';
-    const isNeha = ent.id.includes('neha') || ent.caseId === '112';
-
-    const baseDeptAngle = DEPT_ANGLES[ent.department] ?? (idx * 0.4);
-    const countInDept = deptEntityCounts[ent.department] || 0;
-    deptEntityCounts[ent.department] = countInDept + 1;
-
-    let statusType: SimNode['statusType'] = 'baseline';
-    let color = '#38BDF8';
-    let glowColor = '#0284C7';
-    let size = 0.36;
-    let residualRisk = ent.details?.residualRiskScore ?? ent.riskScore ?? 4.0;
-    let branchAngle = baseDeptAngle + (countInDept - 1.5) * 0.32;
-    let initialPos = new THREE.Vector3();
-
-    if (isDevraj) {
-      statusType = 'escalated';
-      color = '#FF3B30';
-      glowColor = '#FF2A1A';
-      size = 0.72;
-      residualRisk = 98.4;
-      branchAngle = 0.25;
-      initialPos.set(29.5, 2.0, 5.6); // Far isolated outer tip on right wing
-    } else if (isArjun) {
-      statusType = 'hold';
-      color = '#F59E0B';
-      glowColor = '#FBBF24';
-      size = 0.56;
-      residualRisk = 42.0;
-      branchAngle = 3.14;
-      initialPos.set(-22.8, 1.2, -3.4); // Mid-radius outlier branch on left wing
-    } else if (isPriya) {
-      statusType = 'cleared';
-      color = '#10B981';
-      glowColor = '#34D399';
-      size = 0.48;
-      residualRisk = 25.0;
-      branchAngle = 0.15;
-      initialPos.set(8.5, -0.3, 1.2); // Calm green core
-    } else if (isNeha) {
-      statusType = 'indeterminate';
-      color = '#38BDF8';
-      glowColor = '#7DD3FC';
-      size = 0.44;
-      residualRisk = 25.0;
-      branchAngle = 1.05;
-      initialPos.set(-6.2, 0.4, 2.8); // Calm transition ring
-    } else if (residualRisk > 25) {
-      // Minor elevated blip entity (Kavita, Chen)
-      statusType = 'elevated';
-      color = '#F59E0B';
-      glowColor = '#D97706';
-      size = 0.42;
-      const radius = 8.5 + (residualRisk / 100) * 3.8;
-      initialPos.set(
-        Math.cos(branchAngle) * radius * X_STRETCH,
-        (pseudoRandom(idx * 17) - 0.5) * 0.8,
-        Math.sin(branchAngle) * radius * 0.85
-      );
-    } else {
-      // Calm dense core entity: distributed comfortably across department sector
-      statusType = 'baseline';
-      const deptColors = DEPT_COLORS[ent.department];
-      color = deptColors?.color || '#38BDF8';
-      glowColor = deptColors?.glow || '#0284C7';
-      size = 0.34;
-      const radius = 4.2 + ((idx * 3) % 4) * 1.2 + pseudoRandom(idx * 7) * 1.0;
-      initialPos.set(
-        Math.cos(branchAngle) * radius * X_STRETCH,
-        (pseudoRandom(idx * 13) - 0.5) * 1.0,
-        Math.sin(branchAngle) * radius * 0.85
-      );
-    }
-
-    const node: SimNode = {
-      id: ent.id,
-      name: ent.name,
-      role: ent.role,
-      department: ent.department,
-      residualRisk,
-      rawScore: ent.details?.rawDeviationScore ?? (isNeha ? 25 : ent.riskScore),
-      coverage: ent.details?.contextCoverageScore ?? (isPriya ? 100 : isArjun ? 59 : 95),
-      caseStatus: ent.caseStatus || (residualRisk > 25 ? 'Reviewing' : 'Cleared'),
-      statusType,
-      pos: initialPos,
-      vel: new THREE.Vector3(0, 0, 0),
-      size,
-      color,
-      glowColor,
-      isOutlier: isDevraj || isArjun,
-      branchAngle,
-    };
-
-    nodes.push(node);
-    nodeMap.set(node.id, node);
-
-    // 6. Connect Roster Node to its Department Sector Hub & Center Hub
-    const matchingDeptHub = deptHubs.find((h) => h.dept === ent.department) || deptHubs[0];
-
-    if (!isDevraj && !isArjun) {
-      // Connect to Department Hub
-      edges.push({
-        id: `edge-hub-${node.id}`,
-        source: matchingDeptHub.id,
-        target: node.id,
-        statusType,
-        color: isPriya ? '#10B981' : isNeha ? '#38BDF8' : statusType === 'elevated' ? '#F59E0B' : '#38BDF866',
-        glowColor: isPriya ? '#34D399' : isNeha ? '#7DD3FC' : statusType === 'elevated' ? '#FDE68A' : '#0284C7',
-        curveElevation: (pseudoRandom(idx) - 0.5) * 0.3,
-        pulse: isPriya || isNeha || statusType === 'elevated',
-        pulseSpeed: 1.0,
-        lineWidth: isPriya || isNeha || statusType === 'elevated' ? 2 : 1,
-      });
-
-      // Also connect directly to Center Sun Hub if close
-      if (pseudoRandom(idx * 3) > 0.4 || isPriya) {
-        edges.push({
-          id: `edge-sun-${node.id}`,
-          source: sunHub.id,
-          target: node.id,
-          statusType,
-          color: isPriya ? '#34D39988' : '#38BDF844',
-          glowColor: isPriya ? '#6EE7B7' : '#0EA5E9',
-          curveElevation: (pseudoRandom(idx * 5) - 0.5) * 0.2,
-          lineWidth: 1,
-        });
-      }
-    }
-  });
-
-  // 7. Connect Primary Outliers with Glowing Curved Multi-Segment Tree Branches
-  // Devraj: Core -> SG Relay 1 -> SG Relay 2 -> Devraj Outlier Node
-  edges.push({
-    id: 'edge-core-devraj-1',
-    source: 'hub_infra',
-    target: devrajRelay1.id,
-    statusType: 'escalated',
-    color: '#FF3B30',
-    glowColor: '#FF6B6B',
-    curveElevation: 0.6,
-    pulse: true,
-    pulseSpeed: 1.8,
-    pulseColor: '#FF6B6B',
-    lineWidth: 2.5,
-  });
-  edges.push({
-    id: 'edge-devraj-1-2',
-    source: devrajRelay1.id,
-    target: devrajRelay2.id,
-    statusType: 'escalated',
-    color: '#FF3B30',
-    glowColor: '#FFA3A3',
-    curveElevation: 0.8,
-    pulse: true,
-    pulseSpeed: 2.4,
-    pulseColor: '#FFA3A3',
-    lineWidth: 3,
-  });
-  const devrajNode = nodes.find((n) => n.id.includes('devraj'));
-  if (devrajNode) {
-    edges.push({
-      id: 'edge-devraj-2-node',
-      source: devrajRelay2.id,
-      target: devrajNode.id,
-      statusType: 'escalated',
-      color: '#FF2A1A',
-      glowColor: '#FFFFFF',
-      curveElevation: 0.9,
-      pulse: true,
-      pulseSpeed: 3.2,
-      pulseColor: '#FFFFFF',
-      lineWidth: 3.5,
-    });
-  }
-
-  // Arjun: Core -> Data Hub -> Arjun Migration Bridge -> Arjun
-  edges.push({
-    id: 'edge-core-arjun-bridge',
-    source: 'hub_data',
-    target: arjunBridge.id,
-    statusType: 'hold',
-    color: '#F59E0B',
-    glowColor: '#FDE68A',
-    curveElevation: -0.6,
-    pulse: true,
-    pulseSpeed: 1.2,
-    pulseColor: '#FDE68A',
-    lineWidth: 2,
-  });
-  const arjunNode = nodes.find((n) => n.id.includes('arjun'));
-  if (arjunNode) {
-    edges.push({
-      id: 'edge-arjun-bridge-node',
-      source: arjunBridge.id,
-      target: arjunNode.id,
-      statusType: 'hold',
-      color: '#F59E0B',
-      glowColor: '#FFFBEB',
-      curveElevation: -0.7,
-      pulse: true,
-      pulseSpeed: 1.5,
-      pulseColor: '#FFFBEB',
-      lineWidth: 2.5,
-    });
-  }
-
-  // 8. Force-Directed Radial Simulation (180 Relaxation Steps)
-  const iterations = 180;
-  const kRepulsion = 4.2;
-
-  for (let step = 0; step < iterations; step++) {
-    const temp = Math.max(0.01, 1 - step / iterations);
-
-    // Repulsion between non-synthetic node pairs with elliptical aspect preservation
-    for (let i = 0; i < nodes.length; i++) {
-      if (nodes[i].id === sunHub.id) continue;
-      for (let j = i + 1; j < nodes.length; j++) {
-        if (nodes[j].id === sunHub.id) continue;
-        const nA = nodes[i];
-        const nB = nodes[j];
-        const diff = new THREE.Vector3().subVectors(nA.pos, nB.pos);
-        diff.x /= X_STRETCH;
-        const distSq = diff.lengthSq() + 0.1;
-        const force = (kRepulsion / distSq) * temp;
-        diff.normalize().multiplyScalar(force);
-        diff.x *= X_STRETCH;
-        nA.vel.add(diff);
-        nB.vel.sub(diff);
-      }
-    }
-
-    // Radial Target Constraint: distance from (0,0,0) proportional to residualRisk
-    nodes.forEach((node) => {
-      if (node.id === sunHub.id) return;
-
-      let targetRadius = 4.4;
-      if (node.isOutlier && node.residualRisk > 90) {
-        targetRadius = 14.8; // Devraj outer detachment on right wing
-      } else if (node.isOutlier && node.residualRisk > 40) {
-        targetRadius = 11.2; // Arjun mid-branch on left wing
-      } else if (node.statusType === 'elevated') {
-        targetRadius = 7.8 + (node.residualRisk / 100) * 3.0; // Minor elevated blips
-      } else if (node.residualRisk <= 25) {
-        targetRadius = 3.8 + pseudoRandom(node.id.length) * 2.4; // Dense calm core
-      }
-
-      const currRad = Math.sqrt((node.pos.x / X_STRETCH) ** 2 + (node.pos.z / 0.85) ** 2);
-      const radDiff = targetRadius - currRad;
-
-      const radDir = new THREE.Vector3(node.pos.x / X_STRETCH, 0, node.pos.z / 0.85).normalize();
-      if (radDir.lengthSq() === 0) {
-        radDir.set(Math.cos(node.branchAngle), 0, Math.sin(node.branchAngle));
-      }
-
-      radDir.x *= X_STRETCH;
-      radDir.z *= 0.85;
-      node.vel.add(radDir.multiplyScalar(radDiff * 0.18 * temp));
-      node.vel.y -= node.pos.y * 0.25 * temp; // Flatten into disk plane
-
-      // Apply velocity with damping
-      node.pos.add(node.vel.clone().multiplyScalar(0.7));
-      node.vel.multiplyScalar(0.45);
-    });
-  }
-
-  return { nodes, edges };
+  return [orderedStarts[0]];
 }
 
 // ----------------------------------------------------------------------------
@@ -585,12 +357,30 @@ function GlowingCurvedEdge({
   edge,
   sourcePos,
   targetPos,
+  selected,
+  trafficActive,
+  trafficOffset,
+  anomalyStage,
+  onSelect,
 }: {
   edge: SimEdge;
   sourcePos: THREE.Vector3;
   targetPos: THREE.Vector3;
+  selected: boolean;
+  trafficActive: boolean;
+  trafficOffset: number;
+  anomalyStage: 'none' | 'moving' | 'tracking' | 'contained';
+  onSelect: (edge: SimEdge) => void;
 }) {
-  const pulseMeshRef = useRef<THREE.Mesh>(null);
+  const trafficRefs = useRef<Array<THREE.Mesh | null>>([]);
+  const anomalyRef = useRef<THREE.Mesh>(null);
+  const trackerRef = useRef<THREE.Mesh>(null);
+  const containmentRingRef = useRef<THREE.Mesh>(null);
+  const stageStartedAt = useRef(0);
+
+  useEffect(() => {
+    stageStartedAt.current = performance.now() / 1000;
+  }, [anomalyStage]);
 
   // Compute smooth quadratic curve
   const curve = useMemo(() => {
@@ -599,44 +389,70 @@ function GlowingCurvedEdge({
     return new THREE.QuadraticBezierCurve3(sourcePos, mid, targetPos);
   }, [sourcePos, targetPos, edge.curveElevation]);
 
-  const { coreLine, glowLine } = useMemo(() => {
+  const { coreLine, glowLine, hitGeometry } = useMemo(() => {
     const points = curve.getPoints(24);
     const geometry = new THREE.BufferGeometry().setFromPoints(points);
+    const evidenceStyle = EVIDENCE_STYLE[edge.evidenceBasis];
+    const opacity = Math.min(0.92, evidenceStyle.opacity * (0.7 + edge.priorProbability * 0.55));
 
-    const isHighRisk = edge.statusType === 'escalated';
-    const isHold = edge.statusType === 'hold';
-    const isCleared = edge.statusType === 'cleared';
-    const isElevated = edge.statusType === 'elevated';
-
-    // Sharp luminous core line
-    const coreMat = new THREE.LineBasicMaterial({
-      color: edge.color,
-      transparent: true,
-      opacity: isHighRisk ? 0.95 : isHold ? 0.85 : isCleared ? 0.75 : isElevated ? 0.7 : 0.4,
-      linewidth: 1,
-    });
+    const coreMat = edge.evidenceBasis === 'configured'
+      ? new THREE.LineBasicMaterial({
+          color: edge.color,
+          transparent: true,
+          opacity: selected ? 1 : opacity,
+        })
+      : new THREE.LineDashedMaterial({
+          color: edge.color,
+          transparent: true,
+          opacity: selected ? 0.95 : opacity,
+          dashSize: edge.evidenceBasis === 'inferred' ? 0.45 : 0.24,
+          gapSize: edge.evidenceBasis === 'unsupported' ? 0.5 : 0.3,
+        });
     const core = new THREE.Line(geometry, coreMat);
+    if (coreMat instanceof THREE.LineDashedMaterial) core.computeLineDistances();
 
-    // Soft additive bloom glow line
     const glowMat = new THREE.LineBasicMaterial({
       color: edge.glowColor,
       transparent: true,
-      opacity: isHighRisk ? 0.6 : isHold ? 0.45 : isCleared ? 0.35 : isElevated ? 0.35 : 0.2,
+      opacity: selected ? 0.6 : opacity * 0.25,
       blending: THREE.AdditiveBlending,
-      linewidth: 2,
     });
     const glow = new THREE.Line(geometry, glowMat);
 
-    return { coreLine: core, glowLine: glow };
-  }, [curve, edge]);
+    return {
+      coreLine: core,
+      glowLine: glow,
+      hitGeometry: new THREE.TubeGeometry(curve, 18, 0.16, 5, false),
+    };
+  }, [curve, edge, selected]);
 
-  // Animate traveling data pulse along high-risk / active edges
+  // Small blue particles are illustrative telemetry. Red/cyan particles are the
+  // explicitly-labelled synthetic anomaly and digital-twin response.
   useFrame(({ clock }) => {
-    if (edge.pulse && pulseMeshRef.current) {
-      const speed = edge.pulseSpeed || 1.5;
-      const t = (clock.getElapsedTime() * speed * 0.3) % 1.0;
-      const pt = curve.getPoint(t);
-      pulseMeshRef.current.position.copy(pt);
+    if (trafficActive) {
+      trafficRefs.current.forEach((mesh, index) => {
+        if (!mesh) return;
+        const t = (clock.getElapsedTime() * (0.12 + index * 0.018) + trafficOffset + index / 3) % 1;
+        mesh.position.copy(curve.getPoint(t));
+        const shimmer = 0.78 + Math.sin(clock.getElapsedTime() * 4 + index) * 0.18;
+        mesh.scale.setScalar(shimmer);
+      });
+    }
+
+    const stageElapsed = performance.now() / 1000 - stageStartedAt.current;
+    if (anomalyStage === 'moving' && anomalyRef.current) {
+      anomalyRef.current.position.copy(curve.getPoint(Math.min(0.96, stageElapsed / 1.35)));
+    }
+    if (anomalyStage === 'tracking') {
+      const anomalyT = Math.min(0.82, 0.12 + stageElapsed / 1.8);
+      anomalyRef.current?.position.copy(curve.getPoint(anomalyT));
+      trackerRef.current?.position.copy(curve.getPoint(Math.max(0.02, anomalyT - 0.16)));
+    }
+    if (anomalyStage === 'contained' && containmentRingRef.current) {
+      containmentRingRef.current.position.copy(targetPos);
+      containmentRingRef.current.rotation.z += 0.018;
+      const pulse = 1 + Math.sin(clock.getElapsedTime() * 5) * 0.14;
+      containmentRingRef.current.scale.setScalar(pulse);
     }
   });
 
@@ -644,15 +460,39 @@ function GlowingCurvedEdge({
     <group>
       <primitive object={coreLine} />
       <primitive object={glowLine} />
-      {edge.pulse && (
-        <mesh ref={pulseMeshRef}>
-          <sphereGeometry args={[edge.statusType === 'escalated' ? 0.16 : 0.11, 16, 16]} />
-          <meshBasicMaterial
-            color={edge.pulseColor || '#FFFFFF'}
-            transparent
-            opacity={0.95}
-            blending={THREE.AdditiveBlending}
-          />
+      <mesh
+        geometry={hitGeometry}
+        onClick={(event) => {
+          event.stopPropagation();
+          onSelect(edge);
+        }}
+      >
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>
+      {trafficActive && [0, 1, 2].map((index) => (
+        <mesh key={index} ref={(mesh) => { trafficRefs.current[index] = mesh; }}>
+          <sphereGeometry args={[0.075, 10, 10]} />
+          <meshBasicMaterial color="#67E8F9" transparent opacity={0.9} blending={THREE.AdditiveBlending} depthWrite={false} />
+        </mesh>
+      ))}
+      {(anomalyStage === 'moving' || anomalyStage === 'tracking') && (
+        <mesh ref={anomalyRef}>
+          <sphereGeometry args={[0.2, 18, 18]} />
+          <meshBasicMaterial color="#FB3B57" transparent opacity={1} blending={THREE.AdditiveBlending} depthWrite={false} />
+          <pointLight color="#FB3B57" intensity={2.4} distance={3.5} />
+        </mesh>
+      )}
+      {anomalyStage === 'tracking' && (
+        <mesh ref={trackerRef}>
+          <sphereGeometry args={[0.13, 16, 16]} />
+          <meshBasicMaterial color="#22D3EE" transparent opacity={1} blending={THREE.AdditiveBlending} depthWrite={false} />
+          <pointLight color="#22D3EE" intensity={2} distance={3} />
+        </mesh>
+      )}
+      {anomalyStage === 'contained' && (
+        <mesh ref={containmentRingRef} rotation={[Math.PI / 2, 0, 0]}>
+          <torusGeometry args={[0.72, 0.07, 12, 48]} />
+          <meshBasicMaterial color="#22D3EE" transparent opacity={0.95} blending={THREE.AdditiveBlending} depthWrite={false} />
         </mesh>
       )}
     </group>
@@ -756,7 +596,19 @@ function StarburstNodeMesh({
 
       {/* 2. Core Solid Sphere Mesh */}
       <mesh>
-        <sphereGeometry args={[node.size, 32, 32]} />
+        {node.isIdentity ? (
+          <sphereGeometry args={[node.size, 32, 32]} />
+        ) : node.assetType === 'database' ? (
+          <cylinderGeometry args={[node.size * 0.9, node.size * 0.9, node.size * 1.35, 24]} />
+        ) : node.assetType === 'application' ? (
+          <octahedronGeometry args={[node.size, 0]} />
+        ) : node.assetType === 'external_entry' ? (
+          <coneGeometry args={[node.size, node.size * 1.6, 24]} />
+        ) : node.assetType === 'security_infrastructure' ? (
+          <dodecahedronGeometry args={[node.size, 0]} />
+        ) : (
+          <boxGeometry args={[node.size * 1.35, node.size, node.size * 1.1]} />
+        )}
         <meshStandardMaterial
           color={hovered || isSelected ? '#FFFFFF' : node.color}
           emissive={node.glowColor}
@@ -806,8 +658,10 @@ function ScreenProjector({
 
       // Check if node is in front of camera
       const isVisible = v.z < 1;
-      const x = (v.x * 0.5 + 0.5) * size.width;
-      const y = (-(v.y * 0.5) + 0.5) * size.height;
+      const rawX = (v.x * 0.5 + 0.5) * size.width;
+      const rawY = (-(v.y * 0.5) + 0.5) * size.height;
+      const x = Math.max(70, Math.min(size.width - 70, rawX));
+      const y = Math.max(34, Math.min(size.height - 34, rawY));
 
       projected[n.id] = { x, y, visible: isVisible };
     });
@@ -859,9 +713,9 @@ function ResponsiveCameraController({
       centerX: (minX + maxX) / 2,
       centerY: (minY + maxY) / 2,
       centerZ: (minZ + maxZ) / 2,
-      width: Math.max(20, maxX - minX),
-      height: Math.max(4, maxY - minY),
-      depth: Math.max(12, maxZ - minZ),
+      width: Math.max(12, maxX - minX),
+      height: Math.max(3, maxY - minY),
+      depth: Math.max(8, maxZ - minZ),
     };
   }, [nodes]);
 
@@ -875,16 +729,16 @@ function ResponsiveCameraController({
     const tanHalfFov = Math.tan(fovRad / 2);
 
     // Padding factor: fills the available width and height of the container edge-to-edge
-    const padding = aspect > 2.0 ? 1.04 : aspect > 1.3 ? 1.07 : 1.10;
+    const padding = aspect > 2.0 ? 1.1 : aspect > 1.3 ? 1.14 : 1.2;
     const distForWidth = ((bounds.width * padding) / 2) / (tanHalfFov * aspect);
 
     // Camera pitch ~ 24 degrees looking down
-    const pitch = 0.42; // rad
+    const pitch = 0.55;
     const effectiveDepth = bounds.depth * Math.cos(pitch) + bounds.height * Math.sin(pitch);
     const distForHeight = ((effectiveDepth * padding) / 2) / tanHalfFov;
 
     const idealDist = Math.max(distForWidth, distForHeight);
-    const clampedDist = Math.max(12, Math.min(65, idealDist));
+    const clampedDist = Math.max(10, Math.min(58, idealDist));
 
     const camX = bounds.centerX;
     const camY = bounds.centerY + clampedDist * Math.sin(pitch);
@@ -907,26 +761,60 @@ function ResponsiveCameraController({
 // Main Network3DGraph Component
 // ----------------------------------------------------------------------------
 export function Network3DGraph({
-  entities,
-  onSelectEntity,
-  onOpenCase,
+  entities: _entities,
+  onSelectEntity: _onSelectEntity,
+  onOpenCase: _onOpenCase,
   onReseed,
   selectedEntityId,
-  departmentFilter = 'all',
-  theme = 'dark',
+  departmentFilter: _departmentFilter = 'all',
+  theme: _theme = 'dark',
+  scenarioId,
 }: Network3DGraphProps) {
   const [hoveredNode, setHoveredNode] = useState<SimNode | null>(null);
-  const [autoRotate, setAutoRotate] = useState<boolean>(true);
+  const [autoRotate, setAutoRotate] = useState<boolean>(false);
   const [resetTrigger, setResetTrigger] = useState<number>(0);
+  const [graphData, setGraphData] = useState<ScenarioGraphData | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(selectedEntityId || null);
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
+  const [simulationPhase, setSimulationPhase] = useState<SimulationPhase>('idle');
   const [projectedPositions, setProjectedPositions] = useState<
     Record<string, { x: number; y: number; visible: boolean }>
   >({});
   const controlsRef = useRef<any>(null);
+  const simulationTimersRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
 
-  // Compute force-directed physics layout with radial starburst topology across full roster
-  const { nodes, edges } = useMemo(() => {
-    return computeForceLayout(entities, departmentFilter);
-  }, [entities, departmentFilter]);
+  const clearSimulationTimers = () => {
+    simulationTimersRef.current.forEach((timer) => clearTimeout(timer));
+    simulationTimersRef.current = [];
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    setGraphData(null);
+    setLoadError(null);
+    setHoveredNode(null);
+    setSelectedNodeId(null);
+    setSelectedEdgeId(null);
+    clearSimulationTimers();
+    setSimulationPhase('idle');
+    loadScenarioGraphData(scenarioId)
+      .then((data) => {
+        if (!cancelled) setGraphData(data);
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) setLoadError(error instanceof Error ? error.message : String(error));
+      });
+    return () => {
+      cancelled = true;
+      clearSimulationTimers();
+    };
+  }, [scenarioId]);
+
+  const { nodes, edges, unresolvedAliases } = useMemo(
+    () => graphData ? computeForceLayout(graphData) : { nodes: [], edges: [], unresolvedAliases: 0 },
+    [graphData],
+  );
 
   const nodePosMap = useMemo(() => {
     const map = new Map<string, THREE.Vector3>();
@@ -934,20 +822,62 @@ export function Network3DGraph({
     return map;
   }, [nodes]);
 
-  const personaNodes = useMemo(() => {
-    return nodes.filter((n) => !n.isSyntheticNode);
-  }, [nodes]);
+  const simulationRoute = useMemo(() => chooseSimulationRoute(edges, nodes), [edges, nodes]);
+  const simulationRouteIndex = useMemo(
+    () => new Map(simulationRoute.map((edge, index) => [edge.id, index])),
+    [simulationRoute],
+  );
+  const trafficEdgeIds = useMemo(() => {
+    const preferred = edges.filter((edge, index) => edge.evidenceBasis === 'configured' || index % 3 === 0);
+    return new Set(preferred.slice(0, 18).map((edge) => edge.id));
+  }, [edges]);
+
+  const selectedNode = useMemo(
+    () => nodes.find((node) => node.id === selectedNodeId) || null,
+    [nodes, selectedNodeId],
+  );
+  const selectedEdge = useMemo(
+    () => edges.find((edge) => edge.id === selectedEdgeId) || null,
+    [edges, selectedEdgeId],
+  );
+  const inspectedNode = hoveredNode || selectedNode;
+  const assetName = (assetId: string) => nodes.find((node) => node.id === assetId)?.name || assetId;
 
   const handleResetCamera = () => {
     setResetTrigger((prev) => prev + 1);
   };
 
+  const runTwinSimulation = () => {
+    if (simulationRoute.length === 0) return;
+    clearSimulationTimers();
+    setSelectedNodeId(null);
+    setSelectedEdgeId(null);
+    setSimulationPhase('telemetry');
+    simulationTimersRef.current = [
+      setTimeout(() => setSimulationPhase('anomaly'), 2400),
+      setTimeout(() => setSimulationPhase('tracking'), 3850),
+      setTimeout(() => setSimulationPhase('contained'), 5550),
+    ];
+  };
+
+  const simulationCopy: Record<SimulationPhase, { title: string; detail: string; color: string }> = {
+    idle: { title: 'Twin simulation ready', detail: 'Illustrative demo using existing candidate relationships.', color: 'text-zinc-400' },
+    telemetry: { title: 'Baseline telemetry streaming', detail: 'Normal synthetic transfers are moving between entities.', color: 'text-cyan-300' },
+    anomaly: { title: 'Synthetic anomaly introduced', detail: 'Demo signal is attempting movement across one candidate link.', color: 'text-rose-300' },
+    tracking: { title: 'Digital twin tracking movement', detail: 'The cyan tracker is correlating the synthetic signal.', color: 'text-cyan-300' },
+    contained: { title: 'Synthetic movement contained', detail: 'Digital twin intercepted the demo signal. No compromise is asserted.', color: 'text-emerald-300' },
+  };
+
   return (
-    <div className="relative w-full h-[640px] lg:h-[700px] xl:h-[740px] rounded-2xl overflow-hidden border border-white/10 bg-[#020206] select-none">
+    <div className="relative w-full h-[600px] lg:h-[640px] xl:h-[680px] rounded-2xl overflow-hidden border border-white/10 bg-[#020206] select-none">
       {/* 3D WebGL Canvas */}
       <Canvas
-        camera={{ position: [2.0, 12, 26], fov: 45 }}
+        camera={{ position: [0, 10, 24], fov: 42 }}
         gl={{ antialias: true, alpha: true, toneMapping: THREE.ACESFilmicToneMapping }}
+        onPointerMissed={() => {
+          setSelectedNodeId(null);
+          setSelectedEdgeId(null);
+        }}
       >
         <ResponsiveCameraController
           nodes={nodes}
@@ -962,13 +892,13 @@ export function Network3DGraph({
         {/* Orbit Controls */}
         <OrbitControls
           ref={controlsRef}
-          target={[1.75, 0, 0.5]}
+          target={[0, 0, 0]}
           enablePan={true}
           enableZoom={true}
           enableRotate={true}
           autoRotate={autoRotate}
           autoRotateSpeed={0.35}
-          maxDistance={50}
+          maxDistance={65}
           minDistance={6}
           maxPolarAngle={Math.PI / 2 + 0.15}
         />
@@ -980,104 +910,100 @@ export function Network3DGraph({
           if (!srcPos || !tgtPos) return null;
 
           return (
-            <GlowingCurvedEdge
-              key={edge.id}
-              edge={edge}
-              sourcePos={srcPos}
-              targetPos={tgtPos}
-            />
+            <React.Fragment key={edge.id}>
+              <GlowingCurvedEdge
+                edge={edge}
+                sourcePos={srcPos}
+                targetPos={tgtPos}
+                selected={edge.id === selectedEdgeId}
+                trafficActive={simulationPhase !== 'idle' && trafficEdgeIds.has(edge.id)}
+                trafficOffset={(hashString(edge.id) % 100) / 100}
+                anomalyStage={(() => {
+                  const routeIndex = simulationRouteIndex.get(edge.id);
+                  if (routeIndex === undefined) return 'none';
+                  if (simulationPhase === 'anomaly' && routeIndex === 0) return 'moving';
+                  if (simulationPhase === 'tracking' && routeIndex === simulationRoute.length - 1) return 'tracking';
+                  if (simulationPhase === 'contained' && routeIndex === simulationRoute.length - 1) return 'contained';
+                  return 'none';
+                })()}
+                onSelect={(nextEdge) => {
+                  setSelectedEdgeId(nextEdge.id);
+                  setSelectedNodeId(null);
+                }}
+              />
+            </React.Fragment>
           );
         })}
 
         {/* Starburst Constellation Nodes */}
         {nodes.map((node) => (
-          <StarburstNodeMesh
-            key={node.id}
-            node={node}
-            isSelected={selectedEntityId === node.id}
-            onHover={(n) => setHoveredNode(n)}
-            onUnhover={() => setHoveredNode(null)}
-            onClick={(n) => {
-              onSelectEntity(n.id);
-            }}
-          />
+          <React.Fragment key={node.id}>
+            <StarburstNodeMesh
+              node={node}
+              isSelected={selectedNodeId === node.id}
+              onHover={(n) => setHoveredNode(n)}
+              onUnhover={() => setHoveredNode(null)}
+              onClick={(n) => {
+                setSelectedNodeId(n.id);
+                setSelectedEdgeId(null);
+              }}
+            />
+          </React.Fragment>
         ))}
 
         {/* Screen Position Projector */}
         <ScreenProjector nodes={nodes} onPositionsUpdated={setProjectedPositions} />
       </Canvas>
 
-      {/* 2D Projected Persona Billboard Chips Overlay */}
+      {/* Projected labels preserve the employee treatment while distinguishing infrastructure. */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        {personaNodes.map((node) => {
+        {nodes.map((node) => {
           const pos = projectedPositions[node.id];
           if (!pos || !pos.visible) return null;
 
-          const isSelected = selectedEntityId === node.id;
-          const isEscalated = node.statusType === 'escalated';
-          const isHold = node.statusType === 'hold';
-          const isCleared = node.statusType === 'cleared';
-          const isElevated = node.statusType === 'elevated';
-          const isPrimaryPersona =
-            node.id.includes('devraj') ||
-            node.id.includes('arjun') ||
-            node.id.includes('priya') ||
-            node.id.includes('neha') ||
-            isEscalated ||
-            isHold ||
-            isElevated;
+          const isSelected = selectedNodeId === node.id;
+          const labelSeed = hashString(node.id);
+          const labelOffsetX = labelSeed % 3 === 0 ? -12 : labelSeed % 3 === 1 ? 12 : 0;
+          const labelOffsetY = labelSeed % 2 === 0 ? 27 : -27;
 
           return (
             <div
               key={node.id}
               style={{
-                transform: `translate3d(${pos.x}px, ${pos.y + 24}px, 0) translate(-50%, -50%)`,
+                transform: `translate3d(${pos.x + labelOffsetX}px, ${pos.y + labelOffsetY}px, 0) translate(-50%, -50%)`,
               }}
               onClick={(e) => {
                 e.stopPropagation();
-                onSelectEntity(node.id);
+                setSelectedNodeId(node.id);
+                setSelectedEdgeId(null);
               }}
               onMouseEnter={() => setHoveredNode(node)}
               onMouseLeave={() => setHoveredNode(null)}
-              className={`pointer-events-auto absolute cursor-pointer select-none transition-all duration-75 rounded-full text-[10px] font-mono whitespace-nowrap shadow-2xl flex items-center gap-1.5 border backdrop-blur-md ${
-                isPrimaryPersona ? 'px-2 py-0.5' : 'px-1.5 py-0.5 opacity-85 hover:opacity-100'
-              } ${
+              className={`pointer-events-auto absolute cursor-pointer select-none transition-all duration-75 rounded-full text-[10px] font-mono whitespace-nowrap shadow-2xl flex items-center gap-1.5 border backdrop-blur-md px-2 py-0.5 ${
                 isSelected
                   ? 'bg-zinc-900 border-[#C6613F] text-white ring-2 ring-[#C6613F]/50 scale-105 z-30'
-                  : isEscalated
-                  ? 'bg-[#180505]/95 border-rose-500 text-rose-100 ring-1 ring-rose-500/40 hover:border-rose-400 z-30'
-                  : isHold
+                  : node.isEntryPoint
+                  ? 'bg-[#181005]/95 border-orange-500/80 text-orange-100 hover:border-orange-400 z-20'
+                  : node.isCriticalTarget
                   ? 'bg-[#160e04]/95 border-amber-500/80 text-amber-100 hover:border-amber-400 z-20'
-                  : isElevated
-                  ? 'bg-[#181105]/95 border-amber-500/60 text-amber-200 hover:border-amber-400 z-20'
-                  : isCleared
-                  ? 'bg-[#05140c]/95 border-emerald-500/60 text-emerald-100 hover:border-emerald-400 z-10'
+                  : node.isIdentity
+                  ? 'bg-[#05111c]/95 border-sky-500/60 text-sky-100 hover:border-sky-400 z-20'
                   : 'bg-[#05111c]/95 border-sky-500/60 text-sky-100 hover:border-sky-400 z-10'
               }`}
             >
-              <PersonaAvatar
-                id={node.id}
-                name={node.name}
-                size="xs"
-                status={node.statusType as any}
-                showBorder={false}
-              />
-              <span className="font-semibold tracking-tight">{node.name.split(' ')[0]}</span>
-              <span
-                className={`text-[9px] px-1 rounded font-bold ${
-                  isEscalated
-                    ? 'bg-rose-500/40 text-rose-200'
-                    : isHold
-                    ? 'bg-amber-500/40 text-amber-200'
-                    : isElevated
-                    ? 'bg-amber-500/30 text-amber-200'
-                    : isCleared
-                    ? 'bg-emerald-500/40 text-emerald-200'
-                    : 'bg-sky-500/30 text-sky-200'
-                }`}
-              >
-                {Math.round(node.residualRisk)}
-              </span>
+              {node.isIdentity ? (
+                <PersonaAvatar id={node.id} name={node.name} size="xs" status="baseline" showBorder={false} />
+              ) : (
+                <span className="w-4 h-4 rounded bg-white/10 flex items-center justify-center text-[8px] font-bold">
+                  {node.assetType === 'database' ? 'DB' : node.assetType === 'external_entry' ? 'IN' : node.assetType.slice(0, 2).toUpperCase()}
+                </span>
+              )}
+              <span className="font-semibold tracking-tight max-w-32 truncate">{node.name}</span>
+              {node.investigationEvents.length > 0 && (
+                <span className="text-[9px] px-1 rounded font-bold bg-amber-500/25 text-amber-200">
+                  {node.investigationEvents.length}
+                </span>
+              )}
             </div>
           );
         })}
@@ -1085,6 +1011,9 @@ export function Network3DGraph({
 
       {/* Graph Floating Controls Bar */}
       <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
+        <span className="px-2.5 py-1.5 rounded-lg text-[10px] font-mono bg-black/70 border border-white/10 text-zinc-300 backdrop-blur-md">
+          {scenarioId} · {nodes.length} entities · {edges.length} candidates
+        </span>
         {SHOW_DEV_CONTROLS && onReseed && (
           <button
             onClick={onReseed}
@@ -1095,6 +1024,16 @@ export function Network3DGraph({
             <span>Reseed Dataset</span>
           </button>
         )}
+
+        <button
+          onClick={runTwinSimulation}
+          disabled={!graphData || simulationRoute.length === 0}
+          className="group flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-mono font-semibold bg-cyan-400/10 hover:bg-cyan-400/20 text-cyan-100 border border-cyan-400/35 hover:border-cyan-300/60 transition-all shadow-[0_0_24px_rgba(34,211,238,0.08)] backdrop-blur-md cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+          title="Run an illustrative digital-twin telemetry and containment sequence"
+        >
+          {simulationPhase === 'contained' ? <ShieldCheck className="w-3.5 h-3.5 text-emerald-300" /> : <Play className="w-3.5 h-3.5 fill-cyan-300/30" />}
+          <span>{simulationPhase === 'idle' ? 'Run Twin Simulation' : simulationPhase === 'contained' ? 'Replay Simulation' : 'Restart Simulation'}</span>
+        </button>
 
         <button
           onClick={() => setAutoRotate(!autoRotate)}
@@ -1117,87 +1056,128 @@ export function Network3DGraph({
         </button>
       </div>
 
-      {/* Radial Physics Drift Legend Overlay */}
+      {simulationPhase !== 'idle' && (
+        <div className="absolute bottom-4 right-4 z-20 w-[320px] max-w-[calc(100%_-_2rem)] rounded-xl border border-white/10 bg-zinc-950/90 px-4 py-3 font-mono shadow-2xl backdrop-blur-md">
+          <div className="flex items-center gap-3">
+            <div className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full border ${simulationPhase === 'contained' ? 'border-emerald-400/50 bg-emerald-400/10' : simulationPhase === 'anomaly' ? 'border-rose-400/50 bg-rose-400/10' : 'border-cyan-400/50 bg-cyan-400/10'}`}>
+              {simulationPhase === 'contained' ? <ShieldCheck className="h-4 w-4 text-emerald-300" /> : <span className={`h-2.5 w-2.5 rounded-full ${simulationPhase === 'anomaly' ? 'bg-rose-400' : 'bg-cyan-300'} animate-pulse`} />}
+            </div>
+            <div className="min-w-0">
+              <div className={`text-[11px] font-bold ${simulationCopy[simulationPhase].color}`}>{simulationCopy[simulationPhase].title}</div>
+              <div className="mt-0.5 text-[9px] leading-relaxed text-zinc-500">{simulationCopy[simulationPhase].detail}</div>
+            </div>
+          </div>
+          <div className="mt-2.5 flex items-center gap-1.5 text-[8px] uppercase tracking-[0.14em] text-zinc-600">
+            <span className="text-zinc-500">Demo</span><span>•</span><span>synthetic signal</span><span>•</span><span>candidate links</span>
+          </div>
+        </div>
+      )}
+
+      {/* Candidate relationship legend */}
       <div className="absolute bottom-4 left-4 z-20 p-3.5 rounded-xl bg-zinc-950/90 border border-white/10 backdrop-blur-md text-[11px] font-mono max-w-sm space-y-2 shadow-2xl">
         <div className="flex items-center justify-between gap-2 text-zinc-200 font-bold border-b border-white/10 pb-1.5">
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-[#FF3B30] animate-pulse" />
-            <span>Organization Telemetry Topology (19 Nodes)</span>
+            <span className="w-2 h-2 rounded-full bg-sky-400" />
+            <span>Attack Path Candidate Graph</span>
           </div>
-          <span className="text-[10px] text-cyan-400 font-normal">Radial Force Layout</span>
+          <span className="text-[10px] text-cyan-400 font-normal">Prior estimates</span>
         </div>
 
         <p className="text-[10px] text-zinc-400 leading-snug">
-          Distance from radiant core $\propto$ <strong className="text-zinc-200">Residual Risk</strong>. ~15 calm employees cluster in the core grouped by department; anomalous actors push out along isolated branches.
+          Lines are candidate relationships, not confirmed or feasible attacker moves. Weight and opacity reflect the supplied prior probability and evidence basis.
         </p>
 
         <div className="grid grid-cols-2 gap-x-3 gap-y-1 pt-1 text-[10px] text-zinc-300">
-          <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-[#FF3B30] ring-2 ring-rose-500/30" />
-            <span className="font-semibold text-rose-300">Devraj (Outlier · 98)</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-[#F59E0B] ring-2 ring-amber-500/30" />
-            <span className="font-semibold text-amber-300">Arjun (Hold · 42)</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-[#10B981] ring-2 ring-emerald-500/30" />
-            <span className="font-semibold text-emerald-300">Priya (Cleared · 25)</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-[#38BDF8] ring-2 ring-sky-500/30" />
-            <span className="font-semibold text-sky-300">Calm Core Cluster</span>
-          </div>
+          <span className="text-sky-300">━━ configured</span>
+          <span className="text-violet-300">┅┅ inferred</span>
+          <span className="text-amber-300">┅┅ weak</span>
+          <span className="text-zinc-500">┅┅ unsupported</span>
         </div>
+        {unresolvedAliases > 0 && <p className="text-[9px] text-zinc-500">{unresolvedAliases} event aliases remain conservatively unresolved.</p>}
       </div>
 
-      {/* Hover Node Inspector Detail Card */}
-      {hoveredNode && !hoveredNode.isSyntheticNode && (
-        <div className="absolute top-4 left-4 z-20 p-4 rounded-xl bg-zinc-950/95 border border-white/15 backdrop-blur-md shadow-2xl text-xs font-mono max-w-xs animate-in fade-in duration-150">
+      {(inspectedNode || selectedEdge) && (
+        <div className="absolute top-4 left-4 z-20 p-4 rounded-xl bg-zinc-950/95 border border-white/15 backdrop-blur-md shadow-2xl text-xs font-mono w-[360px] max-w-[calc(100%_-_2rem)] max-h-[560px] overflow-y-auto animate-in fade-in duration-150">
+          {selectedEdge ? (
+            <>
+              <div className="text-[10px] uppercase tracking-wider text-violet-300 mb-2">Candidate relationship</div>
+              <h4 className="font-bold text-white text-sm">{selectedEdge.relationshipType.replaceAll('_', ' ')}</h4>
+              <p className="mt-1 text-zinc-300">{assetName(selectedEdge.source)} → {assetName(selectedEdge.target)}</p>
+              <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-white/10">
+                <div><span className="text-zinc-500">Evidence basis</span><div className="text-zinc-200">{selectedEdge.evidenceBasis}</div></div>
+                <div><span className="text-zinc-500">Prior estimate</span><div className="text-zinc-200">{Math.round(selectedEdge.priorProbability * 100)}%</div></div>
+              </div>
+              <p className="mt-3 text-[10px] text-amber-200/80">A prior is an initial estimate only; it does not establish reachability or compromise.</p>
+              <div className="mt-3 pt-3 border-t border-white/10">
+                <div className="text-zinc-400 mb-2">Matching events ({selectedEdge.events.length})</div>
+                {selectedEdge.events.slice(0, 5).map((event) => (
+                  <div key={event.event_id} className="mb-2 rounded bg-white/[0.04] p-2">
+                    <div className="text-zinc-200">{event.event_type.replaceAll('_', ' ')}</div>
+                    <div className="text-[9px] text-zinc-500">{formatScenarioTimestamp(event.timestamp)} · {event.source}</div>
+                  </div>
+                ))}
+                {selectedEdge.events.length === 0 && <p className="text-zinc-500">No raw event resolves uniquely to both endpoints.</p>}
+              </div>
+            </>
+          ) : inspectedNode ? (
+            <>
           <div className="flex items-start gap-3 mb-2.5">
-            <PersonaAvatar
-              id={hoveredNode.id}
-              name={hoveredNode.name}
-              size="md"
-              status={hoveredNode.statusType as any}
-            />
+            {inspectedNode.isIdentity ? <PersonaAvatar id={inspectedNode.id} name={inspectedNode.name} size="md" status="baseline" /> : <div className="w-9 h-9 rounded-lg bg-white/10 flex items-center justify-center text-[10px] font-bold">{inspectedNode.assetType.slice(0, 3).toUpperCase()}</div>}
             <div className="min-w-0 flex-1">
-              <h4 className="font-bold text-white text-xs truncate">{hoveredNode.name}</h4>
-              <p className="text-[10px] text-zinc-400 truncate">{hoveredNode.role}</p>
-              <p className="text-[10px] text-zinc-500">{hoveredNode.department}</p>
+              <h4 className="font-bold text-white text-xs truncate">{inspectedNode.name}</h4>
+              <p className="text-[10px] text-zinc-400">{inspectedNode.assetType.replaceAll('_', ' ')}</p>
+              <p className="text-[10px] text-zinc-500">{inspectedNode.id} · {inspectedNode.asset.zone}</p>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/10 text-[10px]">
-            <div>
-              <span className="text-zinc-400">Residual Risk:</span>
-              <span
-                className={`font-bold ml-1 ${
-                  hoveredNode.statusType === 'escalated'
-                    ? 'text-rose-400'
-                    : hoveredNode.statusType === 'hold' || hoveredNode.statusType === 'elevated'
-                    ? 'text-amber-400'
-                    : 'text-emerald-400'
-                }`}
-              >
-                {Math.round(hoveredNode.residualRisk)}/100
-              </span>
-            </div>
-            <div>
-              <span className="text-zinc-400">Coverage:</span>
-              <span className="font-bold text-zinc-200 ml-1">{Math.round(hoveredNode.coverage)}%</span>
-            </div>
+            <div><span className="text-zinc-500">Exposure</span><div className="text-zinc-200">{inspectedNode.asset.exposure}</div></div>
+            <div><span className="text-zinc-500">Criticality</span><div className="text-zinc-200">{inspectedNode.asset.criticality}/5</div></div>
+            <div><span className="text-zinc-500">Evidence coverage</span><div className="text-zinc-200">{Math.round(inspectedNode.asset.evidence_coverage * 100)}%</div></div>
+            <div><span className="text-zinc-500">Relationships</span><div className="text-zinc-200">{inspectedNode.connectedEdgeIds.length}</div></div>
           </div>
-
-          <button
-            onClick={() => onOpenCase(hoveredNode.id)}
-            className="mt-3 w-full py-1.5 rounded-lg bg-[#C6613F]/20 hover:bg-[#C6613F]/30 text-[#E07B57] border border-[#C6613F]/40 text-[10px] font-bold flex items-center justify-center gap-1 cursor-pointer transition-colors"
-          >
-            <span>Inspect Forensic Dossier</span>
-            <ArrowUpRight className="w-3 h-3" />
-          </button>
+          {(inspectedNode.asset.email || inspectedNode.asset.hostname || inspectedNode.asset.ip_address) && (
+            <p className="mt-3 text-[10px] text-zinc-400 break-all">
+              {inspectedNode.asset.email || inspectedNode.asset.hostname || inspectedNode.asset.ip_address}
+            </p>
+          )}
+          {inspectedNode.asset.security_controls.length > 0 && <p className="mt-3 text-[10px] text-zinc-400">Controls: {inspectedNode.asset.security_controls.join(', ')}</p>}
+          <div className="mt-3 pt-3 border-t border-white/10">
+            <div className="text-zinc-300 mb-2">Connected candidate relationships</div>
+            {edges.filter((edge) => inspectedNode.connectedEdgeIds.includes(edge.id)).slice(0, 5).map((edge) => (
+              <button
+                key={edge.id}
+                onClick={() => {
+                  setSelectedEdgeId(edge.id);
+                  setSelectedNodeId(null);
+                  setHoveredNode(null);
+                }}
+                className="w-full text-left mb-1.5 rounded bg-white/[0.04] hover:bg-white/[0.08] p-2 cursor-pointer"
+              >
+                <div className="text-zinc-200">{edge.relationshipType.replaceAll('_', ' ')}</div>
+                <div className="text-[9px] text-zinc-500 truncate">{assetName(edge.source)} → {assetName(edge.target)} · prior {Math.round(edge.priorProbability * 100)}%</div>
+              </button>
+            ))}
+          </div>
+          <div className="mt-3 pt-3 border-t border-white/10">
+            <div className="flex items-center justify-between mb-2"><span className="text-zinc-300">Investigation context</span><span className="text-amber-300">{inspectedNode.investigationEvents.length} review signals</span></div>
+            <p className="text-[9px] text-zinc-500 mb-2">Event type and fields warrant review; they do not confirm compromise.</p>
+            {inspectedNode.investigationEvents.slice(0, 4).map((event) => (
+              <div key={event.event_id} className="mb-2 rounded bg-white/[0.04] p-2">
+                <div className="text-zinc-200">{event.event_type.replaceAll('_', ' ')}</div>
+                <div className="text-[9px] text-zinc-500">{formatScenarioTimestamp(event.timestamp)} · {event.source}</div>
+                <div className="text-[9px] text-zinc-400 mt-1 truncate">{Object.entries(event.observed_fields).slice(0, 3).map(([key, value]) => `${key}: ${value}`).join(' · ')}</div>
+              </div>
+            ))}
+            {inspectedNode.investigationEvents.length === 0 && <p className="text-zinc-500">No review-signal event types resolve uniquely to this entity.</p>}
+          </div>
+            </>
+          ) : null}
         </div>
       )}
+
+      {!graphData && !loadError && <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#020206]/70 text-xs font-mono text-zinc-400">Loading {scenarioId} graph data…</div>}
+      {loadError && <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#020206]/90 text-xs font-mono text-rose-300">{loadError}</div>}
     </div>
   );
 }
