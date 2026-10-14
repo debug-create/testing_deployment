@@ -16,6 +16,7 @@ from app.api.v1.paths import router as paths_router
 from app.api.v1.simulations import router as simulations_router
 from app.api.v1.interventions import router as interventions_router
 from app.api.v1.websocket import router as websocket_router
+from app.api.compat import router as compat_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -55,7 +56,9 @@ async def compiler_exception_handler(request: Request, exc: CompilerBaseExceptio
         content={"error": exc.__class__.__name__, "detail": exc.detail}
     )
 
-# Service Health Endpoint
+# Service Health Endpoints
+@app.get("/health", tags=["Health"])
+@app.get("/api/health", tags=["Health"])
 @app.get("/api/v1/health", tags=["Health"])
 def health_check():
     return {
@@ -76,3 +79,8 @@ app.include_router(paths_router, prefix=settings.API_V1_STR, tags=["Attack Paths
 app.include_router(simulations_router, prefix=settings.API_V1_STR, tags=["Simulations"])
 app.include_router(interventions_router, prefix=settings.API_V1_STR, tags=["Interventions"])
 app.include_router(websocket_router, prefix=settings.API_V1_STR, tags=["Live Updates"])
+
+# Register Frontend Compatibility & Evaluation routes under /api
+app.include_router(compat_router, prefix="/api", tags=["Frontend Compatibility"])
+app.include_router(compat_router, prefix=f"{settings.API_V1_STR}/compat", tags=["Frontend Compatibility v1"])
+
