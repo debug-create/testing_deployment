@@ -17,6 +17,7 @@ def compute_graph_chokepoints_and_blast_radius(
     targets = twin.get_targets()
     entry_points = twin.get_entry_points()
 
+    total_system_crit = sum(float(g.nodes[n].get("criticality", 0.5)) for n in g.nodes()) or 1.0
     total_target_crit = sum(float(g.nodes[t].get("criticality", 1.0)) for t in targets) or 1.0
 
     # 1. Compute Blast Radius for each node
@@ -27,7 +28,8 @@ def compute_graph_chokepoints_and_blast_radius(
         
         reachable_targets = [t for t in targets if t in descendants or t == node]
         downstream_crit = sum(float(g.nodes[v].get("criticality", 0.5)) for v in descendants) + node_crit
-        normalized_blast_score = round(min(100.0, (downstream_crit / total_target_crit) * 100.0), 2)
+        normalized_blast_score = round(min(100.0, (downstream_crit / total_system_crit) * 100.0), 2)
+
 
         blast_radius_by_node[node] = {
             "node_id": node,

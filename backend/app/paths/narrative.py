@@ -65,13 +65,16 @@ def generate_attack_narrative(
         })
 
     # 3. Defensive Remediation Suggestion
-    critical_hop = min(hops, key=lambda h: h.edge_probability if h.edge_probability > 0 else 1.0)
-    weak_hop_name = f"{names.get(critical_hop.source_id, critical_hop.source_id)} -> {names.get(critical_hop.target_id, critical_hop.target_id)}"
+    if hops:
+        critical_hop = min(hops, key=lambda h: h.edge_probability if h.edge_probability > 0 else 1.0)
+        weak_hop_name = f"{names.get(critical_hop.source_id, critical_hop.source_id)} -> {names.get(critical_hop.target_id, critical_hop.target_id)}"
+        defensive_action = (
+            f"To neutralize this attack vector with minimal disruption, deploy access controls on relationship "
+            f"'{critical_hop.relationship_id}' ({weak_hop_name}). Severing this single link collapses this entire {total_hops}-hop attack chain."
+        )
+    else:
+        defensive_action = "No traversal hops discovered for this path."
 
-    defensive_action = (
-        f"To neutralize this attack vector with minimal disruption, deploy access controls on relationship "
-        f"'{critical_hop.relationship_id}' ({weak_hop_name}). Severing this single link collapses this entire {total_hops}-hop attack chain."
-    )
 
     return {
         "path_id": path.path_id,

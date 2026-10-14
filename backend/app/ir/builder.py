@@ -44,9 +44,10 @@ def build_ir_graph(
                 relationship_type=rel.relationship_type,
                 attributes=dict(rel.attributes or {}),
                 is_active=rel.is_active,
-                calibrated_probability=rel.attributes.get("prior_probability", 0.5)
+                calibrated_probability=float((rel.attributes or {}).get("prior_probability", 0.5))
             )
             ir.edges[rel.id] = edge
+
 
     # Annotate with evidence
     for ev in evidence_items:

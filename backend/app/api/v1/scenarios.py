@@ -136,7 +136,10 @@ def get_dashboard_state(id: str, db: Session = Depends(get_db)):
     from app.risk.edge_probability import calculate_bayesian_edge_probability
     from app.simulation.reachability import run_monte_carlo_reachability
     from app.optimization.interventions import optimize_interventions
-    from app.api.v1.interventions import DEFAULT_CANDIDATES
+    from app.api.v1.interventions import get_default_candidates
+
+
+
 
     scenario = ScenarioRepository(db).get_or_seed_demo(id)
     if not scenario:
@@ -211,9 +214,10 @@ def get_dashboard_state(id: str, db: Session = Depends(get_db)):
     optimizer_plan = optimize_interventions(
         scenario_id=id,
         budget=5.0,
-        candidates=DEFAULT_CANDIDATES,
+        candidates=get_default_candidates(id),
         current_paths=ranked_paths
     )
+
 
     return {
         "scenario": {

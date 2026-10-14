@@ -210,6 +210,22 @@ metadata:
       SecRequestBodyAccess On
 """
             language = "yaml"
+        elif fmt in ("iam", "json"):
+            code = json.dumps({
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Sid": "EnforceWAFProtectionOnPublicEndpoints",
+                        "Effect": "Deny",
+                        "Action": ["wafv2:GetWebACL", "wafv2:AssociateWebACL"],
+                        "Resource": "*",
+                        "Condition": {
+                            "StringNotEquals": {"aws:RequestedRegion": "us-east-1"}
+                        }
+                    }
+                ]
+            }, indent=2)
+            language = "json"
         else:
             code = """#!/usr/bin/env bash
 # Deploy ModSecurity Virtual Patching Filter
@@ -256,6 +272,22 @@ resource "aws_db_parameter_group" "enforce_tls" {{
 }}
 """
             language = "hcl"
+        elif fmt in ("iam", "json"):
+            code = json.dumps({
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Sid": "EnforceEncryptedDatabaseVaultConnections",
+                        "Effect": "Deny",
+                        "Action": ["rds-db:connect"],
+                        "Resource": "arn:aws:rds-db:*:*:dbuser:*/*",
+                        "Condition": {
+                            "Bool": {"aws:SecureTransport": "false"}
+                        }
+                    }
+                ]
+            }, indent=2)
+            language = "json"
         else:
             code = """#!/usr/bin/env bash
 # Enforce SSL/TLS & Local Subnet in PostgreSQL pg_hba.conf
@@ -263,6 +295,7 @@ echo "hostssl all all 10.0.2.0/24 scram-sha-256" | sudo tee -a /var/lib/postgres
 sudo systemctl reload postgresql
 """
             language = "bash"
+
 
     return {
         "intervention_id": intervention_id,

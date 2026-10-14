@@ -36,7 +36,25 @@ def analyze_deception_status(
     for d in decoy_assets:
         # Evidence directly on decoy
         direct_ev = evidence_by_subject.get(d.id, [])
-        
+        for ev in direct_ev:
+            meta = ev.metadata_payload or {}
+            src = meta.get("source_host") or meta.get("attacker_ip") or meta.get("source_id") or meta.get("origin")
+            if src:
+                src_asset = asset_by_id.get(src)
+                src_name = src_asset.name if src_asset else str(src)
+                last_ev_time = getattr(ev, "observed_at", getattr(ev, "timestamp", None))
+                time_str = last_ev_time.isoformat() if hasattr(last_ev_time, "isoformat") else str(last_ev_time)
+                attributed_intruders.append({
+                    "intruder_node_id": src,
+                    "intruder_node_name": src_name,
+                    "canary_touched_id": d.id,
+                    "canary_touched_name": d.name,
+                    "traversal_vector": "direct_canary_access",
+                    "evidence_count": 1,
+                    "evidence_ids": [ev.id],
+                    "timestamp": time_str
+                })
+
         # Evidence on incoming edges to this decoy
         incoming_edges = incoming_to_node.get(d.id, [])
         edge_ev_list = []
@@ -61,6 +79,7 @@ def analyze_deception_status(
                 })
 
         all_decoy_ev = direct_ev + edge_ev_list
+
         is_triggered = len(all_decoy_ev) > 0
         if is_triggered:
             total_triggers += len(all_decoy_ev)

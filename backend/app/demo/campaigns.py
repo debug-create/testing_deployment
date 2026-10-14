@@ -1,5 +1,6 @@
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List
+import uuid
 from app.schemas.events import SecurityEventCreate
 
 def generate_synthetic_campaign(
@@ -19,6 +20,7 @@ def generate_synthetic_campaign(
     else:
         # Default: payment_breach
         return _generate_payment_campaign(scenario_id, now)
+
 
 
 def _generate_payment_campaign(scenario_id: str, base_time: datetime) -> Dict[str, Any]:
@@ -108,18 +110,22 @@ def _generate_payment_campaign(scenario_id: str, base_time: datetime) -> Dict[st
         }
     ]
 
-    events = [
-        SecurityEventCreate(
-            event_type=d["event_type"],
-            source=d["source"],
-            timestamp=base_time + timedelta(minutes=d["delta_minutes"]),
-            payload=d["payload"]
+    campaign_id = f"camp_payment_{int(base_time.timestamp())}_{uuid.uuid4().hex[:6]}"
+    events = []
+    for d in events_data:
+        p = dict(d["payload"])
+        p["campaign_id"] = campaign_id
+        events.append(
+            SecurityEventCreate(
+                event_type=d["event_type"],
+                source=d["source"],
+                timestamp=base_time + timedelta(minutes=d["delta_minutes"]),
+                payload=p
+            )
         )
-        for d in events_data
-    ]
 
     return {
-        "campaign_id": f"camp_payment_{int(base_time.timestamp())}",
+        "campaign_id": campaign_id,
         "scenario_id": scenario_id,
         "template": "payment_breach",
         "title": title,
@@ -127,6 +133,7 @@ def _generate_payment_campaign(scenario_id: str, base_time: datetime) -> Dict[st
         "total_stages": len(events),
         "events": events
     }
+
 
 
 def _generate_k8s_campaign(scenario_id: str, base_time: datetime) -> Dict[str, Any]:
@@ -211,18 +218,22 @@ def _generate_k8s_campaign(scenario_id: str, base_time: datetime) -> Dict[str, A
         }
     ]
 
-    events = [
-        SecurityEventCreate(
-            event_type=d["event_type"],
-            source=d["source"],
-            timestamp=base_time + timedelta(minutes=d["delta_minutes"]),
-            payload=d["payload"]
+    campaign_id = f"camp_k8s_{int(base_time.timestamp())}_{uuid.uuid4().hex[:6]}"
+    events = []
+    for d in events_data:
+        p = dict(d["payload"])
+        p["campaign_id"] = campaign_id
+        events.append(
+            SecurityEventCreate(
+                event_type=d["event_type"],
+                source=d["source"],
+                timestamp=base_time + timedelta(minutes=d["delta_minutes"]),
+                payload=p
+            )
         )
-        for d in events_data
-    ]
 
     return {
-        "campaign_id": f"camp_k8s_{int(base_time.timestamp())}",
+        "campaign_id": campaign_id,
         "scenario_id": scenario_id,
         "template": "k8s_escape",
         "title": title,
@@ -315,18 +326,22 @@ def _generate_ad_campaign(scenario_id: str, base_time: datetime) -> Dict[str, An
         }
     ]
 
-    events = [
-        SecurityEventCreate(
-            event_type=d["event_type"],
-            source=d["source"],
-            timestamp=base_time + timedelta(minutes=d["delta_minutes"]),
-            payload=d["payload"]
+    campaign_id = f"camp_ad_{int(base_time.timestamp())}_{uuid.uuid4().hex[:6]}"
+    events = []
+    for d in events_data:
+        p = dict(d["payload"])
+        p["campaign_id"] = campaign_id
+        events.append(
+            SecurityEventCreate(
+                event_type=d["event_type"],
+                source=d["source"],
+                timestamp=base_time + timedelta(minutes=d["delta_minutes"]),
+                payload=p
+            )
         )
-        for d in events_data
-    ]
 
     return {
-        "campaign_id": f"camp_ad_{int(base_time.timestamp())}",
+        "campaign_id": campaign_id,
         "scenario_id": scenario_id,
         "template": "ad_ransomware",
         "title": title,
@@ -334,3 +349,4 @@ def _generate_ad_campaign(scenario_id: str, base_time: datetime) -> Dict[str, An
         "total_stages": len(events),
         "events": events
     }
+

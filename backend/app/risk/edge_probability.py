@@ -24,7 +24,10 @@ def calculate_bayesian_edge_probability(
         weight = math.log(conf / (1.0 - conf)) * 0.5
         log_odds += weight
 
+    # Clamp log_odds to prevent float overflow under high evidence volume
+    log_odds = max(-35.0, min(35.0, log_odds))
     # Convert back to probability via sigmoid
     prob = 1.0 / (1.0 + math.exp(-log_odds))
     # Calibrate within operational bounds
     return round(max(0.05, min(0.98, prob)), 4)
+

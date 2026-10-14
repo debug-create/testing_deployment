@@ -44,10 +44,8 @@ class PlaybackManager:
                 "event_result": None
             }
 
-        # Pop next chronological event
-        next_event = queue.pop(0)
-        step_num = self._current_steps.get(scenario_id, 0) + 1
-        self._current_steps[scenario_id] = step_num
+        # Inspect next chronological event
+        next_event = queue[0]
 
         # Process through authoritative pipeline
         pipeline = EventPipelineService(db)
@@ -58,6 +56,12 @@ class PlaybackManager:
             raw_payload=next_event.payload,
             timestamp=next_event.timestamp
         )
+
+        # Advance queue and step counter upon successful processing
+        queue.pop(0)
+        step_num = self._current_steps.get(scenario_id, 0) + 1
+        self._current_steps[scenario_id] = step_num
+
 
         step_data = {
             "scenario_id": scenario_id,

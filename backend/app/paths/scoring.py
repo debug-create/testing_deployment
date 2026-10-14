@@ -44,8 +44,13 @@ def rank_and_score_paths(
             # Check if target or intermediate is a decoy
             u_data = g.nodes[u]
             v_data = g.nodes[v]
-            if u_data.get("properties", {}).get("is_decoy") or v_data.get("properties", {}).get("is_decoy"):
+            def _is_decoy_node(nd):
+                p = nd.get("properties") or {}
+                return bool(p.get("is_decoy") or p.get("canary") or nd.get("asset_type") in ("decoy", "honeypot", "canary"))
+
+            if _is_decoy_node(u_data) or _is_decoy_node(v_data):
                 is_decoy = True
+
 
             if edge_ev_ids or u_data.get("evidence_ids") or v_data.get("evidence_ids"):
                 has_corroborated_evidence = True

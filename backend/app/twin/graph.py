@@ -50,8 +50,10 @@ class SecurityDigitalTwin:
         Creates an independent deep copy of the Digital Twin for what-if simulations.
         Guarantees that what-if simulations NEVER mutate the live scenario.
         """
+        import copy
         cloned = SecurityDigitalTwin.__new__(SecurityDigitalTwin)
         cloned.scenario_id = self.scenario_id
         cloned.graph_version = self.graph_version
-        cloned.nx_graph = self.nx_graph.copy()
+        cloned.nx_graph = copy.deepcopy(self.nx_graph)
         return cloned
+

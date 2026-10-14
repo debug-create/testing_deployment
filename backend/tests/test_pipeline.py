@@ -428,3 +428,63 @@ def test_unified_dashboard_state():
     assert "recommended_remediation" in dash
     assert "selected_interventions" in dash["recommended_remediation"]
 
+def test_multi_scenario_dashboard_and_remediation():
+    # Test k8s dashboard state
+    k8s_dash = client.get("/api/v1/scenarios/scenario_k8s/dashboard-state").json()
+    assert k8s_dash["scenario"]["id"] == "scenario_k8s"
+    assert len(k8s_dash["recommended_remediation"]["selected_interventions"]) > 0
+
+    # Test Active Directory dashboard state
+    ad_dash = client.get("/api/v1/scenarios/scenario_ad/dashboard-state").json()
+    assert ad_dash["scenario"]["id"] == "scenario_ad"
+    assert len(ad_dash["recommended_remediation"]["selected_interventions"]) > 0
+
+def test_repeatable_campaign_executions():
+    # Run 1
+    c1 = client.post("/api/v1/scenarios/scenario_demo/campaigns/generate?template=payment").json()
+    assert c1["playback_staged"] is True
+    s1 = client.post("/api/v1/scenarios/scenario_demo/playback/step")
+    assert s1.status_code == 200
+
+    # Run 2: immediately generating again should not collide with prior hashes
+    c2 = client.post("/api/v1/scenarios/scenario_demo/campaigns/generate?template=payment").json()
+    assert c2["playback_staged"] is True
+    s2 = client.post("/api/v1/scenarios/scenario_demo/playback/step")
+    assert s2.status_code == 200
+    assert s2.json()["status"] == "step_executed"
+
+def test_direct_canary_evidence_attribution():
+    # Ingest event directly against decoy_honeypot asset with source_host metadata
+    res = client.post(
+        "/api/v1/scenarios/scenario_demo/events",
+        json={
+            "event_type": "canary_touch",
+            "source": "honeyd",
+            "payload": {
+                "subject_id": "decoy_honeypot",
+                "subject_type": "asset",
+                "source_host": "host_bastion",
+                "confidence": 0.95
+            }
+        }
+    )
+    assert res.status_code == 201
+
+    dec_res = client.get("/api/v1/scenarios/scenario_demo/deception/status").json()
+    assert dec_res["total_tripwire_triggers"] >= 1
+    assert any(intruder["intruder_node_id"] == "host_bastion" for intruder in dec_res["attributed_intruders"])
+
+def test_code_gen_json_and_iam_support():
+    # Test DB intervention IAM export
+    db_res = client.post("/api/v1/scenarios/scenario_demo/interventions/int_db_tls_mtls/export?format=iam")
+    assert db_res.status_code == 200
+    assert db_res.json()["language"] == "json"
+    assert "EnforceEncryptedDatabaseVaultConnections" in db_res.json()["code"]
+
+    # Test WAF intervention JSON export
+    waf_res = client.post("/api/v1/scenarios/scenario_demo/interventions/int_waf_rules/export?format=json")
+    assert waf_res.status_code == 200
+    assert waf_res.json()["language"] == "json"
+    assert "EnforceWAFProtectionOnPublicEndpoints" in waf_res.json()["code"]
+
+

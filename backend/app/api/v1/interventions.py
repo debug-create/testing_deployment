@@ -54,6 +54,85 @@ DEFAULT_CANDIDATES = [
     )
 ]
 
+K8S_CANDIDATES = [
+    InterventionCandidate(
+        id="int_k8s_imds_v2",
+        name="Enforce IMDSv2 Hop Limit on EC2 Nodes",
+        description="Prevent container processes from querying instance metadata credentials.",
+        cost=2.0,
+        affected_relationship_ids=["k8s_rel_04"],
+        side_effects=["Legacy services relying on IMDSv1 must migrate"]
+    ),
+    InterventionCandidate(
+        id="int_k8s_netpol",
+        name="Kubernetes Ingress Microsegmentation Policy",
+        description="Enforce strict pod network isolation on ingress and frontend services.",
+        cost=3.0,
+        affected_relationship_ids=["k8s_rel_01"],
+        side_effects=["Explicit ingress rules required for inter-namespace services"]
+    ),
+    InterventionCandidate(
+        id="int_k8s_gvisor",
+        name="Sandbox Payment Pods with gVisor Runtime",
+        description="Block container breakout CVEs to underlying worker node kernel.",
+        cost=4.5,
+        affected_relationship_ids=["k8s_rel_03"],
+        side_effects=["Minor performance overhead on syscall-heavy workloads"]
+    ),
+    InterventionCandidate(
+        id="int_k8s_s3_least_privilege",
+        name="Restrict S3 Vault IAM Bucket Policy",
+        description="Sever unauthorized data lake access from compromised worker nodes.",
+        cost=2.5,
+        affected_relationship_ids=["k8s_rel_05"],
+        side_effects=["Requires explicit role session tagging"]
+    )
+]
+
+AD_CANDIDATES = [
+    InterventionCandidate(
+        id="int_ad_smb_signing",
+        name="Enforce SMB Signing and File Share Segmentation",
+        description="Block lateral pivot and NTLM relaying towards internal file share.",
+        cost=2.0,
+        affected_relationship_ids=["ad_rel_01"],
+        side_effects=["1-2% throughput impact on large file transfers"]
+    ),
+    InterventionCandidate(
+        id="int_ad_cred_guard",
+        name="Enable Windows Defender Credential Guard",
+        description="Isolate LSASS memory on RADIUS host to stop credential harvesting.",
+        cost=3.5,
+        affected_relationship_ids=["ad_rel_02"],
+        side_effects=["Requires UEFI Secure Boot and virtualization extensions"]
+    ),
+    InterventionCandidate(
+        id="int_ad_aes_kerberos",
+        name="Enforce AES256 & Protected Users Group",
+        description="Block RC4 Kerberoasting attacks targeting administrative accounts.",
+        cost=3.0,
+        affected_relationship_ids=["ad_rel_03"],
+        side_effects=["Disables legacy NTLM authentication for protected accounts"]
+    ),
+    InterventionCandidate(
+        id="int_ad_dcsync_filter",
+        name="Sever Non-DC Replication (DCSync Filtering)",
+        description="Restrict MS-DRSR directory replication rights to authorized DC computer accounts.",
+        cost=4.0,
+        affected_relationship_ids=["ad_rel_04"],
+        side_effects=["Delegated domain admins cannot initiate manual schema sync"]
+    )
+]
+
+ALL_CANDIDATES = DEFAULT_CANDIDATES + K8S_CANDIDATES + AD_CANDIDATES
+
+def get_default_candidates(scenario_id: str) -> List[InterventionCandidate]:
+    if "k8s" in scenario_id.lower():
+        return K8S_CANDIDATES
+    elif "ad" in scenario_id.lower():
+        return AD_CANDIDATES
+    return DEFAULT_CANDIDATES
+
 @router.post("/scenarios/{id}/interventions/optimize", response_model=InterventionOptimizeResponse)
 def run_intervention_optimizer(id: str, payload: InterventionOptimizeRequest, db: Session = Depends(get_db)):
     scenario = ScenarioRepository(db).get_or_seed_demo(id)
@@ -70,7 +149,7 @@ def run_intervention_optimizer(id: str, payload: InterventionOptimizeRequest, db
     raw_paths = find_all_attack_paths(twin)
     current_paths = rank_and_score_paths(id, scenario.graph_version, raw_paths, twin)
 
-    candidates = payload.candidates if payload.candidates else DEFAULT_CANDIDATES
+    candidates = payload.candidates if payload.candidates else get_default_candidates(id)
 
     return optimize_interventions(
         scenario_id=id,
@@ -91,8 +170,8 @@ def export_intervention_code(
     if not scenario:
         raise ScenarioNotFoundError(id)
 
-    # Locate candidate metadata from defaults or candidate list
-    candidate = next((c for c in DEFAULT_CANDIDATES if c.id == intervention_id), None)
+    # Locate candidate metadata from combined candidate lists
+    candidate = next((c for c in ALL_CANDIDATES if c.id == intervention_id), None)
     name = candidate.name if candidate else intervention_id
     affected = candidate.affected_relationship_ids if candidate else []
 
@@ -102,3 +181,4 @@ def export_intervention_code(
         format_type=format,
         affected_relationships=affected
     )
+
