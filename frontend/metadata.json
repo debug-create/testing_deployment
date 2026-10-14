@@ -1,6 +1,6 @@
 {
-  "name": "IKORI — Cinematic 3D Art Installation",
-  "description": "An interactive digital art installation featuring a reflective crimson chrome botanical sculpture and expressive editorial typography.",
+  "name": "IKORI",
+  "description": "IKORI context-aware security intelligence with deterministic residual risk, identity telemetry, protective holds, and forensic case dossiers.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
