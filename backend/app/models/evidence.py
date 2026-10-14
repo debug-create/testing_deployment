@@ -1,7 +1,10 @@
-import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, String, Float, DateTime, JSON, ForeignKey
 from sqlalchemy.orm import relationship
 from app.persistence.database import Base
+
+def utc_now():
+    return datetime.now(timezone.utc)
 
 class EvidenceModel(Base):
     __tablename__ = "evidence"
@@ -13,7 +16,7 @@ class EvidenceModel(Base):
     subject_id = Column(String(64), nullable=False, index=True)
     claim_type = Column(String(64), nullable=False) # e.g. compromised, lateral_movement, vulnerability_exploited
     confidence = Column(Float, default=0.8, nullable=False) # 0.0 to 1.0
-    observed_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    observed_at = Column(DateTime, default=utc_now, nullable=False)
     metadata_payload = Column(JSON, default=dict, nullable=False)
 
     scenario = relationship("ScenarioModel", back_populates="evidence")

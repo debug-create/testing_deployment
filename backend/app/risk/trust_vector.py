@@ -27,8 +27,10 @@ def compute_trust_vector(
         uncertainty = 0.7
     else:
         coverage = min(1.0, 0.2 + (0.15 * len(evidence_items)))
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         latest_time = max(ev.observed_at for ev in evidence_items)
+        if latest_time.tzinfo is None:
+            latest_time = latest_time.replace(tzinfo=timezone.utc)
         seconds_ago = max(0, (now - latest_time).total_seconds())
         # Freshness decays over 24 hours (86400s)
         freshness = max(0.1, round(1.0 - min(1.0, seconds_ago / 86400.0), 3))

@@ -1,5 +1,5 @@
 from typing import Dict, Any, Tuple
-from datetime import datetime
+from datetime import datetime, timezone
 
 def normalize_event(
     event_type: str,
@@ -18,7 +18,7 @@ def normalize_event(
     normalized_payload["resolved_subject_type"] = str(subject_type).strip()
 
     if timestamp is None:
-        event_time = datetime.utcnow()
+        event_time = datetime.now(timezone.utc)
     else:
         event_time = timestamp
 

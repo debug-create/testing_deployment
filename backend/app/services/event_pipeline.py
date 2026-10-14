@@ -129,14 +129,6 @@ class EventPipelineService:
             evidence_by_subject.setdefault(ev.subject_id, []).append(ev)
 
         ir = build_ir_graph(scenario_id, new_version, assets, relationships, all_evidence)
-
-        # Update calibrated probabilities in IR
-        for edge_id, edge in ir.edges.items():
-            edge_evidence = evidence_by_subject.get(edge_id, [])
-            base_prior = float(edge.attributes.get("prior_probability", 0.5))
-            calibrated_p = calculate_bayesian_edge_probability(base_prior, edge_evidence)
-            edge.calibrated_probability = calibrated_p
-
         digital_twin = SecurityDigitalTwin(ir)
 
         # 10. Recompute and Rank Attack Paths

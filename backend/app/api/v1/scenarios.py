@@ -66,3 +66,11 @@ def get_audit_trail(id: str, db: Session = Depends(get_db)):
         )
         for r in records
     ]
+
+@router.get("/scenarios/{id}/benchmark")
+def get_scenario_benchmark(id: str, db: Session = Depends(get_db)):
+    from app.demo.ground_truth import evaluate_scenario_benchmark
+    scenario = ScenarioRepository(db).get_or_seed_demo(id)
+    if not scenario:
+        raise ScenarioNotFoundError(id)
+    return evaluate_scenario_benchmark(db, id)

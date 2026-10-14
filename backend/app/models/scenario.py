@@ -1,7 +1,10 @@
-import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, String, Integer, DateTime
 from sqlalchemy.orm import relationship
 from app.persistence.database import Base
+
+def utc_now():
+    return datetime.now(timezone.utc)
 
 class ScenarioModel(Base):
     __tablename__ = "scenarios"
@@ -11,8 +14,8 @@ class ScenarioModel(Base):
     status = Column(String(32), default="active", nullable=False)
     seed = Column(Integer, default=42, nullable=False)
     graph_version = Column(Integer, default=1, nullable=False)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
 
     assets = relationship("AssetModel", back_populates="scenario", cascade="all, delete-orphan")
     relationships = relationship("RelationshipModel", back_populates="scenario", cascade="all, delete-orphan")

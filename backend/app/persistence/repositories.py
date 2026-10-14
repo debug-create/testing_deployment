@@ -40,7 +40,7 @@ class ScenarioRepository:
         scenario = self.get(scenario_id)
         if scenario:
             scenario.graph_version += 1
-            scenario.updated_at = datetime.datetime.utcnow()
+            scenario.updated_at = datetime.datetime.now(datetime.timezone.utc)
             self.db.commit()
             return scenario.graph_version
         return 1

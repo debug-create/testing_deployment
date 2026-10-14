@@ -1,7 +1,10 @@
-import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, String, Integer, Float, DateTime, JSON, ForeignKey
 from sqlalchemy.orm import relationship
 from app.persistence.database import Base
+
+def utc_now():
+    return datetime.now(timezone.utc)
 
 class AttackPathModel(Base):
     __tablename__ = "attack_paths"
@@ -14,7 +17,7 @@ class AttackPathModel(Base):
     risk_score = Column(Float, nullable=False)
     path_nodes = Column(JSON, default=list, nullable=False)
     hops = Column(JSON, default=list, nullable=False)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
 
     scenario = relationship("ScenarioModel", back_populates="attack_paths")
 
@@ -38,7 +41,7 @@ class SimulationRunModel(Base):
     simulation_type = Column(String(64), nullable=False) # 'reachability', 'what_if', 'intervention_opt'
     parameters = Column(JSON, default=dict, nullable=False)
     results = Column(JSON, default=dict, nullable=False)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
 
     scenario = relationship("ScenarioModel", back_populates="simulations")
 
@@ -50,6 +53,6 @@ class AuditRecordModel(Base):
     action = Column(String(128), nullable=False)
     input_hash = Column(String(64), default="", nullable=False)
     output_summary = Column(JSON, default=dict, nullable=False)
-    timestamp = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    timestamp = Column(DateTime, default=utc_now, nullable=False)
 
     scenario = relationship("ScenarioModel", back_populates="audit_records")

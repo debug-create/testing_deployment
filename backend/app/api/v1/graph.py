@@ -53,8 +53,9 @@ def get_graph_snapshot(id: str, db: Session = Depends(get_db)):
     edges_resp = []
     for r in relationships:
         r_ev = evidence_by_subject.get(r.id, [])
+        src_ev = evidence_by_subject.get(r.source_id, [])
         prior = float(r.attributes.get("prior_probability", 0.5) if r.attributes else 0.5)
-        calibrated_p = calculate_bayesian_edge_probability(prior, r_ev)
+        calibrated_p = calculate_bayesian_edge_probability(prior, r_ev + src_ev)
         edges_resp.append(RelationshipResponse(
             id=r.id,
             scenario_id=r.scenario_id,

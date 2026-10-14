@@ -55,4 +55,12 @@ def build_ir_graph(
         elif ev.subject_type == "relationship" and ev.subject_id in ir.edges:
             ir.edges[ev.subject_id].evidence_ids.append(ev.id)
 
+    # Calculate evidence-calibrated Bayesian probabilities for all edges
+    from app.risk.edge_probability import calculate_bayesian_edge_probability
+    for edge in ir.edges.values():
+        edge_ev = [ev for ev in evidence_items if ev.subject_type == "relationship" and ev.subject_id == edge.id]
+        src_ev = [ev for ev in evidence_items if ev.subject_type == "asset" and ev.subject_id == edge.source_id]
+        prior = float(edge.attributes.get("prior_probability", 0.5))
+        edge.calibrated_probability = calculate_bayesian_edge_probability(prior, edge_ev + src_ev)
+
     return ir

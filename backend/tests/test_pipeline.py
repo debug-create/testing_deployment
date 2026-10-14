@@ -126,3 +126,77 @@ def test_cost_aware_intervention_optimization():
     assert data["total_cost"] <= 5.0
     assert len(data["selected_interventions"]) > 0
     assert data["severed_path_count"] > 0
+
+def test_ground_truth_benchmark_validation():
+    res = client.get("/api/v1/scenarios/scenario_demo/benchmark")
+    assert res.status_code == 200
+    report = res.json()
+    assert report["benchmark_passed"] is True
+    assert report["path_recall"] == 1.0
+    assert report["decoy_demotion_healthy"] is True
+    assert report["ground_truth_total_critical_paths"] == 3
+    assert report["discovered_attack_paths"] >= 3
+
+def test_event_affects_path_ranking_and_evidence():
+    # Ingest evidence on payment proxy (rel_02: gw_01 -> svc_app)
+    res = client.post(
+        "/api/v1/scenarios/scenario_demo/events",
+        json={
+            "event_type": "api_exploit_traffic",
+            "source": "suricata_sensor",
+            "payload": {
+                "subject_id": "rel_02",
+                "subject_type": "relationship",
+                "confidence": 0.98,
+                "sqli_detected": True
+            }
+        }
+    )
+    assert res.status_code == 201
+
+    # Fetch paths - verify hop evidence is attached and probability is elevated
+    paths_res = client.get("/api/v1/scenarios/scenario_demo/paths")
+    assert paths_res.status_code == 200
+    paths = paths_res.json()["paths"]
+
+    # Find path via gw_01 -> svc_app -> db_prod
+    payment_path = next(p for p in paths if p["path_nodes"] == ["gw_01", "svc_app", "db_prod"])
+    # The first hop should be rel_02 and have evidence attached
+    rel_02_hop = payment_path["hops"][0]
+    assert rel_02_hop["relationship_id"] == "rel_02"
+    assert len(rel_02_hop["evidence_ids"]) > 0
+    assert rel_02_hop["edge_probability"] > 0.65 # Calibrated up from prior 0.65
+
+def test_reproducibility_of_monte_carlo():
+    res1 = client.post(
+        "/api/v1/scenarios/scenario_demo/simulations/reachability",
+        json={"num_trials": 2000, "seed": 12345}
+    )
+    res2 = client.post(
+        "/api/v1/scenarios/scenario_demo/simulations/reachability",
+        json={"num_trials": 2000, "seed": 12345}
+    )
+    assert res1.status_code == 200
+    assert res2.status_code == 200
+    data1 = res1.json()
+    data2 = res2.json()
+    assert data1["target_reachability_probabilities"] == data2["target_reachability_probabilities"]
+    assert data1["entry_to_target_frequencies"] == data2["entry_to_target_frequencies"]
+
+def test_traceability_principle():
+    """
+    Every displayed attack path must be traceable to explicit relationships and supporting evidence.
+    """
+    graph_res = client.get("/api/v1/scenarios/scenario_demo/graph")
+    graph_edges = {e["id"]: e for e in graph_res.json()["edges"]}
+
+    paths_res = client.get("/api/v1/scenarios/scenario_demo/paths")
+    paths = paths_res.json()["paths"]
+
+    for path in paths:
+        for hop in path["hops"]:
+            assert hop["relationship_id"] in graph_edges
+            edge = graph_edges[hop["relationship_id"]]
+            assert edge["source_id"] == hop["source_id"]
+            assert edge["target_id"] == hop["target_id"]
+            assert hop["edge_probability"] > 0.0
