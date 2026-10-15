@@ -41,8 +41,10 @@ import { RequestMoreContextModal } from './RequestMoreContextModal';
 import { DenyAccessModal } from './DenyAccessModal';
 import { DevrajRevocationModal } from './DevrajRevocationModal';
 import { PersonaAvatar } from './PersonaAvatar';
+import { DecisionEvidenceWorkspace } from './DecisionEvidenceWorkspace';
 import { RECORDING_MODE_BADGE, SIMULATED_ENFORCEMENT_LABEL } from '../constants';
 import { DemoPersona } from '../api/client';
+import { IKORI_PERSONAS } from '../data/identityAliases';
 
 interface AccessRequestsViewProps {
   currentPersona: DemoPersona;
@@ -185,7 +187,7 @@ export function AccessRequestsView({
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-200">
+    <div className="ikori-access-workspace space-y-6 animate-in fade-in duration-200">
       {/* 1. Mandatory Terminology Distinction Banner */}
       <div className="bg-[#0b0f19] border border-white/10 rounded-2xl p-4 sm:p-5 shadow-xl">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-3 pb-3 border-b border-white/10">
@@ -273,10 +275,10 @@ export function AccessRequestsView({
         >
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-3">
-              <PersonaAvatar name="Priya Ramesh" size="md" />
+            <PersonaAvatar name={IKORI_PERSONAS.priya} size="md" />
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-sm text-white">Priya Ramesh</span>
+                  <span className="font-bold text-sm text-white">{IKORI_PERSONAS.priya}</span>
                   <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/15 text-emerald-300 border border-emerald-500/25">
                     AR-203
                   </span>
@@ -315,10 +317,10 @@ export function AccessRequestsView({
         >
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-3">
-              <PersonaAvatar name="Devraj Malhotra" size="md" />
+              <PersonaAvatar name={IKORI_PERSONAS.devraj} size="md" />
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-sm text-white">Devraj Malhotra</span>
+                  <span className="font-bold text-sm text-white">{IKORI_PERSONAS.devraj}</span>
                   <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-rose-500/15 text-rose-300 border border-rose-500/25">
                     AR-104
                   </span>
@@ -565,6 +567,9 @@ export function AccessRequestsView({
 
         {/* Body Content Grid */}
         <div className="p-5 space-y-6">
+          {/* Seeded, backend-replaceable explanation of evidence, trust, and interventions */}
+          <DecisionEvidenceWorkspace request={activeRequest} />
+
           {/* AI Access Review Panel */}
           <AIAccessReviewPanel
             review={activeRequest.aiReview}

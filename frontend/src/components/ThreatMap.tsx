@@ -3,6 +3,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Entity, CaseStatus, EntityLocation } from '../types';
 import * as topojson from 'topojson-client';
 import worldData from 'world-atlas/countries-110m.json';
+import { IKORI_PERSONAS } from '../data/identityAliases';
 import { geoEquirectangular, geoPath } from 'd3-geo';
 import { StatusBadge } from './StatusBadge';
 import {
@@ -32,6 +33,7 @@ interface ThreatMapProps {
   entities: Entity[];
   onOpenCaseDetail: (entityId: string) => void;
   onUpdateEntityStatus: (entityId: string, status: CaseStatus) => void;
+  onNavigateToAccessRequests: () => void;
 }
 
 interface OfficeHub {
@@ -60,20 +62,58 @@ interface TelemetryArc {
   label: string;
 }
 
+type LiveMapPhase = 'baseline' | 'anomaly' | 'tracking' | 'contained';
+
 // Map canvas dimensions for Equirectangular projection
 const MAP_WIDTH = 1000;
 const MAP_HEIGHT = 520;
+
+function getArcGeometry(from: OfficeHub, to: OfficeHub) {
+  const dx = to.x - from.x;
+  const midX = (from.x + to.x) / 2;
+  const curveHeight = Math.min(Math.abs(dx) * 0.26 + Math.abs(to.y - from.y) * 0.08, 105);
+  const ctrlY = Math.min(from.y, to.y) - curveHeight;
+  return {
+    forward: `M ${from.x} ${from.y} Q ${midX} ${ctrlY} ${to.x} ${to.y}`,
+    reverse: `M ${to.x} ${to.y} Q ${midX} ${ctrlY} ${from.x} ${from.y}`,
+  };
+}
 
 export function ThreatMap({
   entities,
   onOpenCaseDetail,
   onUpdateEntityStatus,
+  onNavigateToAccessRequests,
 }: ThreatMapProps) {
   const [hoveredHubId, setHoveredHubId] = useState<string | null>(null);
   const [selectedHubId, setSelectedHubId] = useState<string | null>(null);
   const [confirmingRevokeEntity, setConfirmingRevokeEntity] = useState<Entity | null>(null);
   const [isExecutingRevoke, setIsExecutingRevoke] = useState(false);
   const [simulationNotice, setSimulationNotice] = useState<string | null>(null);
+  const [liveMapPhase, setLiveMapPhase] = useState<LiveMapPhase>('baseline');
+
+  useEffect(() => {
+    let cycleTimers: Array<ReturnType<typeof setTimeout>> = [];
+    let disposed = false;
+
+    const scheduleCycle = () => {
+      if (disposed) return;
+      cycleTimers = [];
+      setLiveMapPhase('baseline');
+      cycleTimers.push(
+        setTimeout(() => setLiveMapPhase('anomaly'), 5200),
+        setTimeout(() => setLiveMapPhase('tracking'), 8500),
+        setTimeout(() => setLiveMapPhase('contained'), 10100),
+        setTimeout(scheduleCycle, 15000),
+      );
+    };
+
+    scheduleCycle();
+    return () => {
+      disposed = true;
+      cycleTimers.forEach((timer) => clearTimeout(timer));
+    };
+  }, []);
 
   // Set up d3 equirectangular projection
   const { projection, landPath } = useMemo(() => {
@@ -151,81 +191,49 @@ export function ThreatMap({
     return result;
   }, [entities, projection]);
 
-  // Telemetry connection arcs
+  // Ambient city-to-city telemetry routes. These are presentation-only flows
+  // between existing monitored hubs and do not assert real incidents.
   const telemetryArcs: TelemetryArc[] = useMemo(() => {
-    const bangalore = hubs.find((h) => h.city === 'Bangalore');
-    const london = hubs.find((h) => h.city === 'London');
-    const sf = hubs.find((h) => h.city === 'San Francisco');
-    const ny = hubs.find((h) => h.city === 'New York');
-    const stockholm = hubs.find((h) => h.city === 'Stockholm');
-    const sydney = hubs.find((h) => h.city === 'Sydney');
-    const singapore = hubs.find((h) => h.city === 'Singapore');
+    const byCity = new Map(hubs.map((hub) => [hub.city, hub]));
+    const routePairs: Array<[string, string, TelemetryArc['type']]> = [
+      ['Seattle', 'Toronto', 'sync'],
+      ['San Francisco', 'London', 'sync'],
+      ['Austin', 'New York', 'audit'],
+      ['New York', 'London', 'sync'],
+      ['Toronto', 'Sao Paulo', 'audit'],
+      ['Sao Paulo', 'London', 'sync'],
+      ['London', 'Amsterdam', 'sync'],
+      ['London', 'Dubai', 'audit'],
+      ['Amsterdam', 'Mumbai', 'sync'],
+      ['Berlin', 'Singapore', 'audit'],
+      ['Dubai', 'Bangalore', 'sync'],
+      ['Mumbai', 'Singapore', 'sync'],
+      ['Bangalore', 'Singapore', 'sync'],
+      ['Singapore', 'Seoul', 'audit'],
+    ];
 
-    const arcs: TelemetryArc[] = [];
-
-    // 1. Bangalore -> London (Critical exfil route for Devraj when active)
-    if (bangalore && london) {
-      arcs.push({
-        id: 'arc-blr-lon',
-        from: bangalore,
-        to: london,
-        type: bangalore.hasEscalated ? 'exfil' : 'sync',
+    return routePairs.flatMap(([fromCity, toCity, type], index) => {
+      const from = byCity.get(fromCity);
+      const to = byCity.get(toCity);
+      if (!from || !to) return [];
+      return [{
+        id: `live-${index}-${from.id}-${to.id}`,
+        from,
+        to,
+        type,
         isActive: true,
-        label: bangalore.hasEscalated
-          ? 'Off-hours DB Replica Stream [ANOMALY]'
-          : 'Encrypted Telemetry Sync',
-      });
-    }
+        label: type === 'audit' ? 'Audit telemetry' : 'Encrypted service telemetry',
+      }];
+    });
+  }, [hubs]);
 
-    // 2. Bangalore -> Singapore
-    if (bangalore && singapore) {
-      arcs.push({
-        id: 'arc-blr-sin',
-        from: bangalore,
-        to: singapore,
-        type: 'sync',
-        isActive: true,
-        label: 'APAC Regional Replication',
-      });
-    }
-
-    // 3. London -> Stockholm
-    if (london && stockholm) {
-      arcs.push({
-        id: 'arc-lon-sto',
-        from: london,
-        to: stockholm,
-        type: 'sync',
-        isActive: true,
-        label: 'EMEA Canary Token Ingestion',
-      });
-    }
-
-    // 4. US SF -> London
-    if (sf && london) {
-      arcs.push({
-        id: 'arc-sf-lon',
-        from: sf,
-        to: london,
-        type: 'sync',
-        isActive: true,
-        label: 'Global IAM & Identity Mesh',
-      });
-    }
-
-    // 5. US NY -> Sydney
-    if (ny && sydney) {
-      arcs.push({
-        id: 'arc-ny-syd',
-        from: ny,
-        to: sydney,
-        type: 'audit',
-        isActive: true,
-        label: 'Compliance Audit Sync',
-      });
-    }
-
-    return arcs;
+  const anomalyRoute = useMemo(() => {
+    if (hubs.length < 2) return null;
+    const origin = hubs.find((hub) => hub.city === 'Bangalore') || hubs.find((hub) => hub.hasEscalated) || hubs[0];
+    const target = hubs.find((hub) => hub.city === 'Singapore' && hub.id !== origin.id)
+      || [...hubs].filter((hub) => hub.id !== origin.id).sort((a, b) => Math.abs(b.x - origin.x) - Math.abs(a.x - origin.x))[0];
+    if (!target) return null;
+    return { origin, target, ...getArcGeometry(origin, target) };
   }, [hubs]);
 
   // Currently focused hub
@@ -281,7 +289,7 @@ export function ThreatMap({
   // Handle Reset Simulation
   const handleResetSimulation = () => {
     onUpdateEntityStatus('devraj', 'Open');
-    setSimulationNotice('Case reset to Open: Devraj Malhotra (#104) active at Bangalore Hub.');
+    setSimulationNotice(`Case reset to Open: ${IKORI_PERSONAS.devraj} (#104) active at Bangalore Hub.`);
     setTimeout(() => setSimulationNotice(null), 4000);
   };
 
@@ -303,88 +311,17 @@ export function ThreatMap({
           <h2 className="text-xl font-bold text-white tracking-tight">
             Global SOC Threat & Intercept Map
           </h2>
-          <p className="text-xs text-zinc-400 max-w-2xl font-sans leading-relaxed">
-            Split-second localization of organizational anomalies. Muted baseline nodes conserve analyst
-            cognitive budget; escalated nodes emit real-time radar signatures.
-          </p>
+          <p className="text-xs text-zinc-400 max-w-2xl font-sans">Live anomaly detection and digital-twin interception across monitored hubs.</p>
         </div>
 
-        {/* Human-Confirmed Decision Actions */}
-        <div className="flex flex-wrap items-center gap-2.5">
-          {isDevrajEscalated ? (
-            <div className="flex items-center gap-2">
-              {/* Button 1: Investigate (available immediately, not gated) */}
-              <button
-                onClick={() => handleInvestigateCase('devraj')}
-                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-mono font-medium bg-zinc-900 border border-white/[0.15] text-zinc-100 hover:text-white hover:bg-zinc-800 hover:border-white/30 transition-all cursor-pointer shadow-sm group"
-                title="Immediately investigate open Case #104 in forensic drawer"
-              >
-                <Activity className="w-3.5 h-3.5 text-amber-400 group-hover:scale-110 transition-transform" />
-                <span>Investigate</span>
-                <span className="text-[10px] text-zinc-400 font-normal">(#104)</span>
-              </button>
-
-              {/* Button 2: Revoke Access (available immediately, human-confirmed) */}
-              <button
-                onClick={() => devrajEntity && handleInitiateRevoke(devrajEntity)}
-                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-mono font-semibold bg-[#E8342A] text-white hover:bg-[#E8342A]/90 transition-all shadow-lg shadow-[#E8342A]/20 cursor-pointer group"
-                title="Initiate human-confirmed emergency access revocation"
-              >
-                <Lock className="w-3.5 h-3.5 text-white group-hover:scale-110 transition-transform" />
-                <span>Revoke Access</span>
-              </button>
-            </div>
-          ) : isDevrajRevoked ? (
-            <div className="flex items-center gap-2">
-              <div className="px-3 py-1.5 rounded-xl bg-zinc-900 border border-rose-800/40 text-rose-300 text-xs font-mono flex items-center gap-2">
-                <Lock className="w-3.5 h-3.5 text-rose-400" />
-                <span>Access Revoked (Human-Confirmed)</span>
-              </div>
-              <button
-                onClick={() => onOpenCaseDetail('devraj')}
-                className="px-3 py-1.5 rounded-xl text-xs font-mono text-zinc-300 bg-zinc-900 border border-white/[0.1] hover:text-white hover:bg-zinc-800 transition-colors cursor-pointer"
-              >
-                Dossier (#104)
-              </button>
-              <button
-                onClick={handleResetSimulation}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-mono font-medium bg-zinc-900 border border-white/[0.1] text-zinc-300 hover:text-white hover:bg-zinc-800 transition-colors cursor-pointer"
-                title="Reset case to Open to test Investigate and Revoke Access flows"
-              >
-                <RotateCcw className="w-3 h-3" />
-                <span>Reopen Case</span>
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <div className="px-3 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-mono flex items-center gap-2">
-                <Activity className="w-3.5 h-3.5 text-amber-400" />
-                <span>Under Investigation</span>
-              </div>
-              <button
-                onClick={() => onOpenCaseDetail('devraj')}
-                className="px-3 py-1.5 rounded-xl text-xs font-mono text-zinc-300 bg-zinc-900 border border-white/[0.1] hover:text-white hover:bg-zinc-800 transition-colors cursor-pointer"
-              >
-                Dossier (#104)
-              </button>
-              <button
-                onClick={() => devrajEntity && handleInitiateRevoke(devrajEntity)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-mono font-semibold bg-[#E8342A] text-white hover:bg-[#E8342A]/90 transition-all shadow-md shadow-[#E8342A]/20 cursor-pointer"
-                title="Initiate human-confirmed emergency access revocation"
-              >
-                <Lock className="w-3.5 h-3.5 text-white" />
-                <span>Revoke Access</span>
-              </button>
-              <button
-                onClick={handleResetSimulation}
-                className="p-1.5 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors cursor-pointer"
-                title="Reset simulation"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          )}
-        </div>
+        <button
+          onClick={onNavigateToAccessRequests}
+          className="inline-flex items-center gap-2 rounded-xl border border-cyan-400/30 bg-cyan-400/10 px-4 py-2 text-xs font-mono font-semibold text-cyan-100 transition-colors hover:bg-cyan-400/15"
+        >
+          <ShieldCheck className="h-4 w-4 text-cyan-300" />
+          Intervention Queue
+          <ChevronRight className="h-3.5 w-3.5" />
+        </button>
       </div>
 
       {/* Action / Simulation Feedback Alert */}
@@ -442,6 +379,15 @@ export function ThreatMap({
             {/* Amber Alert Glow Filter */}
             <filter id="amber-glow" x="-50%" y="-50%" width="200%" height="200%">
               <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+
+            {/* Bright digital-twin trace glow */}
+            <filter id="blue-trace-glow" x="-80%" y="-80%" width="260%" height="260%">
+              <feGaussianBlur in="SourceGraphic" stdDeviation="3.5" result="blur" />
               <feMerge>
                 <feMergeNode in="blur" />
                 <feMergeNode in="SourceGraphic" />
@@ -507,18 +453,9 @@ export function ThreatMap({
 
           {/* Telemetry Connection Arcs */}
           <g className="telemetry-arcs">
-            {telemetryArcs.map((arc) => {
-              // Calculate quadratic Bézier curve control point
-              const dx = arc.to.x - arc.from.x;
-              const dy = arc.to.y - arc.from.y;
-              const midX = (arc.from.x + arc.to.x) / 2;
-              // Arc upwards based on horizontal distance
-              const curveHeight = Math.min(Math.abs(dx) * 0.32, 110);
-              const ctrlY = Math.min(arc.from.y, arc.to.y) - curveHeight;
-
-              const pathD = `M ${arc.from.x} ${arc.from.y} Q ${midX} ${ctrlY} ${arc.to.x} ${arc.to.y}`;
-
-              const isExfil = arc.type === 'exfil';
+            {telemetryArcs.map((arc, arcIndex) => {
+              const pathD = getArcGeometry(arc.from, arc.to).forward;
+              const flowColor = arc.type === 'audit' ? '#818CF8' : '#38BDF8';
 
               return (
                 <g key={arc.id} className="pointer-events-none">
@@ -526,24 +463,100 @@ export function ThreatMap({
                   <path
                     d={pathD}
                     fill="none"
-                    stroke={isExfil ? 'rgba(232, 52, 42, 0.25)' : 'rgba(198, 97, 63, 0.15)'}
-                    strokeWidth={isExfil ? 2 : 1}
+                    stroke={arc.type === 'audit' ? 'rgba(129, 140, 248, 0.18)' : 'rgba(56, 189, 248, 0.16)'}
+                    strokeWidth="1"
                   />
 
                   {/* Flowing animated dash packets */}
                   <path
                     d={pathD}
                     fill="none"
-                    stroke={isExfil ? '#E8342A' : '#C6613F'}
-                    strokeWidth={isExfil ? 2.5 : 1.5}
+                    stroke={flowColor}
+                    strokeWidth="1.35"
                     className="animate-telemetry-flow"
-                    opacity={isExfil ? 0.9 : 0.6}
+                    opacity="0.64"
                     strokeLinecap="round"
                   />
+
+                  {[0, 1, 2].map((particleIndex) => (
+                    <circle
+                      key={`${arc.id}-particle-${particleIndex}`}
+                      r={particleIndex === 0 ? 2.1 : 1.45}
+                      fill={flowColor}
+                      opacity={particleIndex === 0 ? 0.95 : 0.7}
+                      filter={particleIndex === 0 ? 'url(#blue-trace-glow)' : undefined}
+                    >
+                      <animateMotion
+                        dur={`${2.5 + (arcIndex % 4) * 0.42}s`}
+                        begin={`${-(particleIndex * 0.82 + arcIndex * 0.19)}s`}
+                        repeatCount="indefinite"
+                        path={pathD}
+                      />
+                    </circle>
+                  ))}
                 </g>
               );
             })}
           </g>
+
+          {/* Periodic synthetic anomaly and reverse digital-twin interception. */}
+          {anomalyRoute && liveMapPhase !== 'baseline' && (
+            <g className="pointer-events-none">
+              <path
+                d={anomalyRoute.forward}
+                fill="none"
+                stroke="rgba(228, 228, 231, 0.32)"
+                strokeWidth="6.5"
+                strokeLinecap="round"
+              />
+              <path
+                d={anomalyRoute.forward}
+                fill="none"
+                stroke="#020204"
+                strokeWidth="4.6"
+                strokeDasharray="13 9"
+                className="animate-anomaly-flow"
+                strokeLinecap="round"
+              />
+              {(liveMapPhase === 'anomaly' || liveMapPhase === 'tracking') && (
+                <circle r="5" fill="#020204" stroke="rgba(255,255,255,0.72)" strokeWidth="1.3">
+                  <animateMotion dur="2.2s" repeatCount="indefinite" path={anomalyRoute.forward} />
+                </circle>
+              )}
+
+              {(liveMapPhase === 'tracking' || liveMapPhase === 'contained') && (
+                <>
+                  <path
+                    d={anomalyRoute.reverse}
+                    fill="none"
+                    stroke="rgba(56, 189, 248, 0.18)"
+                    strokeWidth="8"
+                    filter="url(#blue-trace-glow)"
+                  />
+                  <path
+                    d={anomalyRoute.reverse}
+                    fill="none"
+                    stroke="#38BDF8"
+                    strokeWidth="2.8"
+                    strokeDasharray="9 12"
+                    className="animate-twin-trace"
+                    strokeLinecap="round"
+                    filter="url(#blue-trace-glow)"
+                  />
+                  <circle r="4.2" fill="#E0F7FF" stroke="#38BDF8" strokeWidth="2" filter="url(#blue-trace-glow)">
+                    <animateMotion dur="1.7s" repeatCount="indefinite" path={anomalyRoute.reverse} />
+                  </circle>
+                </>
+              )}
+
+              {liveMapPhase === 'contained' && (
+                <>
+                  <circle cx={anomalyRoute.origin.x} cy={anomalyRoute.origin.y} r="9" fill="none" stroke="#38BDF8" strokeWidth="2" className="animate-twin-containment" />
+                  <circle cx={anomalyRoute.origin.x} cy={anomalyRoute.origin.y} r="5.5" fill="#E0F7FF" stroke="#38BDF8" strokeWidth="2.5" filter="url(#blue-trace-glow)" />
+                </>
+              )}
+            </g>
+          )}
 
           {/* Office Hub Markers & Interactive Radar Pins */}
           <g className="office-hubs">
@@ -678,156 +691,38 @@ export function ThreatMap({
           </g>
         </svg>
 
-        {/* 3. Floating Interactive HUD Card for Focused/Hovered Hub */}
-        {activeHub && (
-          <div
-            className={`absolute bottom-4 left-4 right-4 sm:right-auto sm:w-96 rounded-xl bg-[#0c0b12]/95 border shadow-2xl p-4 text-xs font-sans backdrop-blur-md transition-all duration-200 z-20 ${
-              activeHub.hasEscalated
-                ? 'border-[#E8342A]/60 shadow-[#E8342A]/20'
-                : activeHub.hasReviewing
-                ? 'border-amber-500/40 shadow-amber-500/10'
-                : 'border-white/[0.1]'
-            }`}
-          >
-            {/* Popover Header */}
-            <div className="flex items-start justify-between gap-3 pb-3 border-b border-white/[0.08]">
+        {/* Compact incident story: detection, twin response, then human intervention. */}
+        {anomalyRoute && (
+          <div className="absolute bottom-4 left-4 z-20 w-[340px] max-w-[calc(100%_-_2rem)] rounded-xl border border-cyan-400/25 bg-[#080b11]/95 p-4 font-mono shadow-[0_16px_50px_rgba(0,0,0,0.55)] backdrop-blur-md">
+            <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
               <div className="flex items-center gap-2.5">
-                <div
-                  className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border ${
-                    activeHub.hasEscalated
-                      ? 'bg-[#E8342A]/20 border-[#E8342A]/40 text-[#E8342A]'
-                      : activeHub.hasReviewing
-                      ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
-                      : 'bg-zinc-800 border-white/[0.1] text-zinc-300'
-                  }`}
-                >
-                  {activeHub.hasEscalated ? (
-                    <ShieldAlert className="w-4 h-4" />
-                  ) : (
-                    <MapPin className="w-4 h-4" />
-                  )}
-                </div>
-
+                <span className={`h-2.5 w-2.5 rounded-full ${liveMapPhase === 'anomaly' ? 'bg-rose-400' : liveMapPhase === 'tracking' ? 'bg-sky-300' : liveMapPhase === 'contained' ? 'bg-emerald-300' : 'bg-cyan-300'} animate-pulse`} />
                 <div>
-                  <div className="flex items-center gap-1.5">
-                    <h3 className="font-bold text-sm text-white">
-                      {activeHub.city}
-                    </h3>
-                    <span className="text-zinc-500">•</span>
-                    <span className="text-[11px] font-mono text-zinc-400">
-                      {activeHub.country}
-                    </span>
-                  </div>
-                  <p className="text-[10px] font-mono text-zinc-400">
-                    {activeHub.entities.length} monitored personnel
-                  </p>
+                  <div className="text-xs font-bold uppercase tracking-[0.12em] text-white">Digital twin incident</div>
+                  <div className="mt-0.5 text-[10px] text-zinc-500">Live simulated response</div>
                 </div>
               </div>
+              <span className="rounded-md bg-white/[0.06] px-2 py-1 text-[9px] uppercase text-zinc-400">{liveMapPhase}</span>
+            </div>
 
-              {/* Status Pill */}
-              <div
-                className={`px-2 py-0.5 rounded text-[10px] font-mono font-semibold uppercase tracking-wider border ${
-                  activeHub.hasEscalated
-                    ? 'bg-[#E8342A]/20 border-[#E8342A]/50 text-[#E8342A]'
-                    : activeHub.hasReviewing
-                    ? 'bg-amber-500/20 border-amber-500/50 text-amber-300'
-                    : 'bg-zinc-800 border-zinc-700 text-zinc-400'
-                }`}
-              >
-                {activeHub.hasEscalated
-                  ? 'CRITICAL ALERT'
-                  : activeHub.hasReviewing
-                  ? 'UNDER REVIEW'
-                  : 'CALM BASELINE'}
+            <div className="space-y-3 py-3 text-xs">
+              <div className="flex gap-3">
+                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-rose-400" />
+                <div><div className="text-zinc-500">Detected</div><div className="mt-0.5 text-sm font-semibold text-white">{anomalyRoute.origin.city} → {anomalyRoute.target.city}</div></div>
+              </div>
+              <div className="flex gap-3">
+                <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-cyan-300" />
+                <div><div className="text-zinc-500">Twin action</div><div className="mt-0.5 text-sm text-zinc-200">{liveMapPhase === 'baseline' ? 'Monitoring normal telemetry' : liveMapPhase === 'anomaly' ? 'Unexpected movement flagged' : liveMapPhase === 'tracking' ? 'Tracing signal back to origin' : 'Origin isolated and route contained'}</div></div>
               </div>
             </div>
 
-            {/* Personnel & Compromised Entity Details */}
-            <div className="py-3 space-y-2 max-h-48 overflow-y-auto">
-              {activeHub.entities.map((ent) => {
-                const isCompromised =
-                  ent.riskLevel === 'escalated' || ent.caseStatus === 'Open';
-
-                return (
-                  <div
-                    key={ent.id}
-                    className={`p-2.5 rounded-lg border transition-all ${
-                      isCompromised
-                        ? 'bg-[#180c0c] border-[#E8342A]/40'
-                        : 'bg-zinc-900/60 border-white/[0.04]'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-2 mb-1">
-                      <div className="min-w-0 flex-1">
-                        <span className="font-semibold text-xs text-white block truncate">
-                          {ent.name}
-                        </span>
-                        <span className="text-[10px] text-zinc-400 truncate block">
-                          {ent.role} • {ent.department}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <span
-                          className={`text-xs font-mono font-bold ${
-                            isCompromised
-                              ? 'text-[#E8342A]'
-                              : ent.riskScore > 40
-                              ? 'text-amber-400'
-                              : 'text-zinc-400'
-                          }`}
-                        >
-                          {ent.riskScore}/100
-                        </span>
-                        <StatusBadge
-                          status={ent.caseStatus}
-                          riskLevel={ent.riskLevel}
-                          riskScore={ent.riskScore}
-                          classification={ent.classification}
-                          size="sm"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Threat vector snippet if compromised */}
-                    {ent.accessVector && (
-                      <p className="text-[10px] font-mono text-zinc-300 truncate mt-1 pt-1 border-t border-white/[0.04]">
-                        Vector: {ent.accessVector}
-                      </p>
-                    )}
-
-                    {/* Quick action buttons per entity - Both available immediately */}
-                    <div className="mt-2.5 pt-2 border-t border-white/[0.06] flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => handleInvestigateCase(ent.id)}
-                        className="px-2.5 py-1 rounded-lg text-[10px] font-mono font-medium text-zinc-200 hover:text-white bg-zinc-800 hover:bg-zinc-700 transition-colors flex items-center gap-1 cursor-pointer"
-                        title="Investigate case in forensic dossier"
-                      >
-                        <Activity className="w-2.5 h-2.5 text-amber-400" />
-                        <span>Investigate</span>
-                      </button>
-
-                      {ent.caseStatus !== 'Containment Recommended' && ent.caseStatus !== 'Cleared' && (
-                        <button
-                          onClick={() => handleInitiateRevoke(ent)}
-                          className="px-2.5 py-1 rounded-lg text-[10px] font-mono font-semibold bg-[#E8342A] text-white hover:bg-[#E8342A]/90 transition-colors flex items-center gap-1 cursor-pointer shadow-sm shadow-[#E8342A]/20"
-                          title="Recommend emergency containment protocol"
-                        >
-                          <Lock className="w-2.5 h-2.5" />
-                          <span>Recommend Containment</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Popover Footer summary */}
-            <div className="pt-2 border-t border-white/[0.06] flex items-center justify-between text-[10px] font-mono text-zinc-400">
-              <span>Coordinates: {(activeHub.lat ?? 0).toFixed(2)}°, {(activeHub.lng ?? 0).toFixed(2)}°</span>
-              <span className="text-zinc-400">IKORI Passive Ingestion</span>
-            </div>
+            <button
+              onClick={onNavigateToAccessRequests}
+              className="flex w-full items-center justify-between rounded-lg border border-cyan-400/25 bg-cyan-400/10 px-3 py-2.5 text-xs font-semibold text-cyan-100 transition-colors hover:bg-cyan-400/15"
+            >
+              Review intervention steps
+              <ChevronRight className="h-4 w-4" />
+            </button>
           </div>
         )}
 
@@ -849,52 +744,17 @@ export function ThreatMap({
             <span>Cleared / Baseline Calm</span>
           </div>
           <div className="flex items-center gap-2 text-zinc-400 pt-1 border-t border-white/[0.06]">
-            <span className="w-3 h-0.5 bg-[#E8342A]" />
-            <span>Anomalous Egress Telemetry</span>
+            <span className="w-3 h-0.5 bg-zinc-950 ring-1 ring-zinc-500" />
+            <span>Anomaly Movement</span>
+          </div>
+          <div className="flex items-center gap-2 text-zinc-300">
+            <span className="w-3 h-0.5 bg-cyan-400 shadow-[0_0_6px_#22d3ee]" />
+            <span>Digital Twin Trace</span>
           </div>
         </div>
       </div>
 
-      {/* 4. Human-Confirmed Decision Architecture Explainer Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="p-4 rounded-xl bg-[#09080d] border border-white/[0.07] space-y-2">
-          <div className="w-7 h-7 rounded-lg bg-[#E8342A]/15 border border-[#E8342A]/30 flex items-center justify-center text-[#E8342A]">
-            <Radio className="w-3.5 h-3.5" />
-          </div>
-          <h4 className="text-xs font-mono font-semibold uppercase tracking-wider text-white">
-            1. Anomaly Triangulation
-          </h4>
-          <p className="text-[11px] text-zinc-400 leading-relaxed font-sans">
-            Bangalore hub telemetry matched off-hours database access and foreign ASN ingress. Context coverage is 0.0%, triggering priority queue escalation.
-          </p>
-        </div>
-
-        <div className="p-4 rounded-xl bg-[#09080d] border border-white/[0.07] space-y-2">
-          <div className="w-7 h-7 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
-            <UserCheck className="w-3.5 h-3.5" />
-          </div>
-          <h4 className="text-xs font-mono font-semibold uppercase tracking-wider text-white">
-            2. Discrete Case Investigation
-          </h4>
-          <p className="text-[11px] text-zinc-400 leading-relaxed font-sans">
-            "Investigate" and "Recommend Containment" are both available directly from the priority queue without arbitrary gating.
-          </p>
-        </div>
-
-        <div className="p-4 rounded-xl bg-[#09080d] border border-white/[0.07] space-y-2">
-          <div className="w-7 h-7 rounded-lg bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400">
-            <Lock className="w-3.5 h-3.5" />
-          </div>
-          <h4 className="text-xs font-mono font-semibold uppercase tracking-wider text-white">
-            3. Containment Recommendation
-          </h4>
-          <p className="text-[11px] text-zinc-400 leading-relaxed font-sans">
-            Critical containment recommendations are logged to the audit ledger with full blast-radius visibility for the incident response team.
-          </p>
-        </div>
-      </div>
-
-      {/* 5. Confirmation Modal for Containment Recommendation */}
+      {/* 4. Confirmation Modal for Containment Recommendation */}
       {confirmingRevokeEntity && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-150">
           <div className="max-w-md w-full rounded-2xl bg-[#0e0c14] border border-[#E8342A]/50 shadow-2xl shadow-[#E8342A]/15 p-6 space-y-4 animate-in zoom-in-95 duration-150 text-zinc-100">

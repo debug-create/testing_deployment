@@ -83,8 +83,8 @@ export function ComparisonStrip({ scenarioId, onScenarioChange }: ComparisonStri
   );
 
   return (
-    <section className="mb-10" aria-label="Scenario Intelligence">
-      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-3 pb-3 mb-4 border-b border-white/[0.06]">
+    <section className="mb-7" aria-label="Scenario Intelligence">
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-3 pb-3 mb-3 border-b border-white/[0.06]">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-[#C6613F]" />
@@ -123,47 +123,44 @@ export function ComparisonStrip({ scenarioId, onScenarioChange }: ComparisonStri
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {CARDS.map((card) => {
-          const primary = card.primary(intelligence);
-          const secondary = card.secondary(intelligence);
+      <div className="ikori-metric-rail relative overflow-hidden rounded-xl border border-white/[0.08] bg-[#09090c]/95 shadow-[0_14px_40px_rgba(0,0,0,0.22)]">
+        <div className="ikori-metric-scan pointer-events-none absolute inset-y-0 left-0 z-0 w-1/4 bg-gradient-to-r from-transparent via-cyan-300/[0.06] to-transparent blur-xl" />
+        <div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+          {CARDS.map((card, index) => {
+            const primary = card.primary(intelligence);
+            const secondary = card.secondary(intelligence);
 
-          return (
-            <article
-              key={card.title}
-              className={`relative p-4 rounded-xl border bg-[#0a0a0c]/90 transition-colors ${card.border}`}
-            >
-              <div className="flex items-center gap-2 mb-3 min-w-0">
-                <span
-                  className={`inline-flex items-center justify-center w-7 h-7 rounded-lg border border-white/[0.06] ${card.accentSoft}`}
-                >
-                  {card.icon}
-                </span>
-                <h3 className="text-[11px] font-mono uppercase tracking-wider text-zinc-400 font-semibold truncate">
-                  {card.title}
-                </h3>
-              </div>
-
-              <div className="space-y-3">
-                <div>
-                  <div className={`text-2xl font-semibold tracking-tight tabular-nums ${card.accent}`}>
-                    {primary.value}
+            return (
+              <article
+                key={card.title}
+                className={`group relative flex min-w-0 items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-white/[0.035] ${
+                  index < CARDS.length - 1 ? 'lg:border-r lg:border-white/[0.07]' : ''
+                } ${index < 2 ? 'sm:border-b lg:border-b-0 border-white/[0.07]' : ''}`}
+              >
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <span className={`relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/[0.07] ${card.accentSoft}`}>
+                    <span className="absolute inset-0 rounded-lg bg-current opacity-0 blur-md transition-opacity group-hover:opacity-15" />
+                    {card.icon}
+                  </span>
+                  <div className="min-w-0">
+                    <h3 className="truncate text-[9px] font-mono font-semibold uppercase tracking-[0.14em] text-zinc-500">
+                      {card.title}
+                    </h3>
+                    <div className="mt-0.5 flex items-baseline gap-1.5 whitespace-nowrap">
+                      <span className={`text-xl font-bold tabular-nums tracking-tight ${card.accent}`}>{primary.value}</span>
+                      <span className="text-[10px] text-zinc-500">{primary.label}</span>
+                    </div>
                   </div>
-                  <div className="text-[11px] text-zinc-500 mt-0.5">{primary.label}</div>
                 </div>
-
-                <div className="pt-2.5 border-t border-white/[0.05] flex items-baseline justify-between gap-2">
-                  <span className="text-[10px] font-mono uppercase tracking-wide text-zinc-500">
-                    {secondary.label}
-                  </span>
-                  <span className="text-sm font-semibold tabular-nums text-zinc-200">
-                    {secondary.value}
-                  </span>
+                <div className="shrink-0 text-right">
+                  <div className="text-sm font-semibold tabular-nums text-zinc-200">{secondary.value}</div>
+                  <div className="max-w-24 truncate text-[8px] font-mono uppercase tracking-wide text-zinc-600">{secondary.label}</div>
                 </div>
-              </div>
-            </article>
-          );
-        })}
+                <span className={`absolute inset-x-4 bottom-0 h-px origin-left scale-x-0 bg-current transition-transform duration-500 group-hover:scale-x-100 ${card.accent}`} />
+              </article>
+            );
+          })}
+        </div>
       </div>
     </section>
   );

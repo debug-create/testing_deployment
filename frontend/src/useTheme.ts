@@ -1,15 +1,15 @@
 // src/useTheme.ts
-// Robust theme management supporting 'dark' | 'light' | 'system' with localStorage persistence
+// Product theme management with localStorage persistence.
 
 import { useState, useEffect, useCallback } from 'react';
 
-export type ThemeMode = 'dark' | 'light' | 'system';
+export type ThemeMode = 'dark' | 'light' | 'system' | 'royal';
 
 export function useTheme() {
   const [theme, setThemeState] = useState<ThemeMode>(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('fable-theme-mode') as ThemeMode;
-      if (stored === 'dark' || stored === 'light' || stored === 'system') {
+      if (stored === 'dark' || stored === 'light' || stored === 'system' || stored === 'royal') {
         return stored;
       }
     }
@@ -25,11 +25,15 @@ export function useTheme() {
     if (mode === 'system') {
       const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
       effective = prefersDark ? 'dark' : 'light';
+    } else if (mode === 'royal') {
+      effective = 'dark';
     } else {
       effective = mode;
     }
 
     setResolvedTheme(effective);
+    root.classList.toggle('product-theme-royal', mode === 'royal');
+    root.dataset.productTheme = mode;
 
     if (effective === 'dark') {
       root.classList.add('dark');

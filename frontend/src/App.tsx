@@ -1,33 +1,21 @@
 // App.tsx
-import React, { useState, useEffect } from 'react';
+import React, { lazy, Suspense, useState, useEffect } from 'react';
 import IkoriHero from './components/IkoriHero';
 import { Shield, Eye, Cpu, Sparkles } from 'lucide-react';
-import { OrgOverview } from './components/OrgOverview';
-import { CaseDetailPage } from './components/CaseDetailPage';
-import { ResultsDashboard } from './components/ResultsDashboard';
 import { useEntities } from './useEntities';
+import { PageRoute, parsePageRoute, ProductView, productViewPath, routePath } from './routing';
 
-type PageRoute =
-  | { path: 'home' }
-  | { path: 'product' }
-  | { path: 'results' }
-  | { path: 'case'; caseId: string };
+const OrgOverview = lazy(() => import('./components/OrgOverview').then((module) => ({ default: module.OrgOverview })));
+const CaseDetailPage = lazy(() => import('./components/CaseDetailPage').then((module) => ({ default: module.CaseDetailPage })));
+const ResultsDashboard = lazy(() => import('./components/ResultsDashboard').then((module) => ({ default: module.ResultsDashboard })));
+
+const RouteFallback = () => <div className="flex min-h-screen items-center justify-center bg-[#060608] font-mono text-xs text-zinc-500">Loading IKORI workspace…</div>;
 
 export default function App() {
   const [route, setRoute] = useState<PageRoute>(() => {
     // Check initial window location if available
     if (typeof window !== 'undefined') {
-      const pathname = window.location.pathname;
-      if (pathname.startsWith('/product/case/')) {
-        const caseId = pathname.replace('/product/case/', '');
-        return { path: 'case', caseId };
-      }
-      if (pathname === '/product') {
-        return { path: 'product' };
-      }
-      if (pathname === '/results') {
-        return { path: 'results' };
-      }
+      return parsePageRoute(window.location.pathname);
     }
     return { path: 'home' };
   });
@@ -42,11 +30,15 @@ export default function App() {
   const navigateTo = (newRoute: PageRoute) => {
     setRoute(newRoute);
     if (typeof window !== 'undefined') {
-      let targetPath = '/';
-      if (newRoute.path === 'product') targetPath = '/product';
-      if (newRoute.path === 'results') targetPath = '/results';
-      if (newRoute.path === 'case') targetPath = `/product/case/${newRoute.caseId}`;
-      window.history.pushState({}, '', targetPath);
+      window.history.pushState({}, '', routePath(newRoute));
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const navigateToProductView = (view: ProductView) => {
+    setRoute({ path: 'product' });
+    if (typeof window !== 'undefined') {
+      window.history.pushState({}, '', productViewPath(view));
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
@@ -54,17 +46,7 @@ export default function App() {
   // Sync browser back/forward buttons
   useEffect(() => {
     const handlePopState = () => {
-      const pathname = window.location.pathname;
-      if (pathname.startsWith('/product/case/')) {
-        const caseId = pathname.replace('/product/case/', '');
-        setRoute({ path: 'case', caseId });
-      } else if (pathname === '/product') {
-        setRoute({ path: 'product' });
-      } else if (pathname === '/results') {
-        setRoute({ path: 'results' });
-      } else {
-        setRoute({ path: 'home' });
-      }
+      setRoute(parsePageRoute(window.location.pathname));
     };
 
     window.addEventListener('popstate', handlePopState);
@@ -75,35 +57,35 @@ export default function App() {
   if (route.path === 'case') {
     const activeEntity = getEntityById(route.caseId) || entities[0];
     return (
-      <CaseDetailPage
+      <Suspense fallback={<RouteFallback />}><CaseDetailPage
         caseId={route.caseId}
         entity={activeEntity}
         onBack={() => navigateTo({ path: 'product' })}
         onUpdateStatus={(status) => updateEntityCaseStatus(route.caseId, status)}
-      />
+      /></Suspense>
     );
   }
 
   // 2. Product Org Overview route: /product
   if (route.path === 'product') {
     return (
-      <OrgOverview
+      <Suspense fallback={<RouteFallback />}><OrgOverview
         entities={entities}
         onNavigateHome={() => navigateTo({ path: 'home' })}
         onUpdateEntityCaseStatus={updateEntityCaseStatus}
         onNavigateToCase={(caseId) => navigateTo({ path: 'case', caseId })}
         onNavigateResults={() => navigateTo({ path: 'results' })}
-      />
+      /></Suspense>
     );
   }
 
   if (route.path === 'results') {
     return (
-      <ResultsDashboard
+      <Suspense fallback={<RouteFallback />}><ResultsDashboard
         entities={entities}
         onNavigateHome={() => navigateTo({ path: 'home' })}
-        onNavigateProduct={() => navigateTo({ path: 'product' })}
-      />
+        onNavigateProduct={navigateToProductView}
+      /></Suspense>
     );
   }
 

@@ -1,4 +1,6 @@
 import catalog from './scenarioIntelligence.json';
+import { resolveScenarioAssetName } from '../identityAliases';
+import interventionCatalog from './interventions.json';
 
 export interface ScenarioIntelligenceRecord {
   scenario_id: string;
@@ -95,7 +97,35 @@ export interface ScenarioGraphData {
   events: ScenarioGraphEvent[];
 }
 
+export interface ScenarioInterventionSideEffect {
+  affected_asset_ids: string[];
+  severity: 'low' | 'medium' | 'high';
+  type: string;
+}
+
+export interface ScenarioIntervention {
+  scenario_id: string;
+  intervention_id: string;
+  name: string;
+  category: string;
+  cost_units: number;
+  requires_approval: boolean;
+  affected_edge_ids: string[];
+  side_effects: ScenarioInterventionSideEffect[];
+}
+
+interface InterventionCatalog {
+  source: string;
+  synthetic: boolean;
+  records: ScenarioIntervention[];
+}
+
 export const SCENARIO_INTELLIGENCE_CATALOG = catalog as ScenarioIntelligenceCatalog;
+const INTERVENTION_CATALOG = interventionCatalog as InterventionCatalog;
+
+export function getScenarioInterventions(scenarioId: string): ScenarioIntervention[] {
+  return INTERVENTION_CATALOG.records.filter((record) => record.scenario_id === scenarioId);
+}
 
 const scenarioGraphModules = import.meta.glob('./scenario_graph/*.json', {
   query: '?raw',
@@ -137,7 +167,7 @@ export function loadScenarioGraphData(
 }
 
 export function formatScenarioAssetName(asset: ScenarioGraphAsset): string {
-  return asset.display_name || asset.hostname || asset.ip_address || asset.asset_id;
+  return resolveScenarioAssetName(asset);
 }
 
 export function formatScenarioTimestamp(value: string | number): string {

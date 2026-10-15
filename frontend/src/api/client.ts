@@ -98,7 +98,7 @@ export function resetDemoState(): void {
 
 // Persona / Identity for Separation of Duties
 export type DemoPersona = 'analyst' | 'reviewer' | 'admin';
-let currentDemoPersona: DemoPersona = 'analyst';
+let currentDemoPersona: DemoPersona = 'admin';
 
 export function getDemoPersona(): DemoPersona {
   return currentDemoPersona;

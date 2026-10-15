@@ -6,11 +6,12 @@
 // - 'session_revoked': an active session was terminated after human approval
 
 import { AccessRequestItem } from '../types';
+import { IKORI_PERSONAS } from './identityAliases';
 
 export const SEED_PRIYA_JIT_REQUEST: AccessRequestItem = {
   id: 'AR-203',
   employeeId: 'USR-101',
-  employeeName: 'Priya Ramesh',
+  employeeName: IKORI_PERSONAS.priya,
   employeeRole: 'SRE Lead',
   department: 'Core Infrastructure',
   avatarSeed: 'priya',
@@ -191,7 +192,7 @@ export const SEED_PRIYA_JIT_REQUEST: AccessRequestItem = {
 export const SEED_DEVRAJ_JIT_REQUEST: AccessRequestItem = {
   id: 'AR-104',
   employeeId: 'USR-104',
-  employeeName: 'Devraj Malhotra',
+  employeeName: IKORI_PERSONAS.devraj,
   employeeRole: 'Staff Infrastructure Engineer',
   department: 'Core Infrastructure',
   avatarSeed: 'devraj',

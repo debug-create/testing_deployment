@@ -14,7 +14,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { Entity } from '../types';
-import { Play, RotateCcw, RefreshCw, ShieldCheck } from 'lucide-react';
+import { RotateCcw, RefreshCw, ShieldCheck } from 'lucide-react';
 import { PersonaAvatar } from './PersonaAvatar';
 import {
   formatScenarioAssetName,
@@ -220,6 +220,12 @@ function computeForceLayout(data: ScenarioGraphData): { nodes: SimNode[]; edges:
     });
   });
 
+  const hubAssetId = [...data.assets]
+    .sort((left, right) => {
+      const degreeDelta = (relationshipsByNode.get(right.asset_id)?.length || 0) - (relationshipsByNode.get(left.asset_id)?.length || 0);
+      return degreeDelta || right.criticality - left.criticality || left.asset_id.localeCompare(right.asset_id);
+    })[0]?.asset_id;
+
   const nodes: SimNode[] = data.assets.map((asset, index) => {
     const style = ASSET_STYLE[asset.asset_type];
     const seed = hashString(`${data.scenario_id}:${asset.asset_id}`);
@@ -228,6 +234,8 @@ function computeForceLayout(data: ScenarioGraphData): { nodes: SimNode[]; edges:
     const events = eventsByNode.get(asset.asset_id) || [];
     const isEntryPoint = data.entry_points.includes(asset.asset_id);
     const isCriticalTarget = data.critical_targets.includes(asset.asset_id);
+    const isCoreHub = asset.asset_id === hubAssetId;
+    const connectedEdgeIds = relationshipsByNode.get(asset.asset_id) || [];
     return {
       id: asset.asset_id,
       name: formatScenarioAssetName(asset),
@@ -237,24 +245,27 @@ function computeForceLayout(data: ScenarioGraphData): { nodes: SimNode[]; edges:
       rawScore: 0,
       coverage: Math.round(asset.evidence_coverage * 100),
       caseStatus: 'Candidate graph entity',
-      statusType: isEntryPoint ? 'elevated' : isCriticalTarget ? 'hold' : IDENTITY_TYPES.has(asset.asset_type) ? 'cleared' : 'baseline',
-      pos: new THREE.Vector3(
-        Math.cos(angle) * radius * 1.35,
-        (pseudoRandom(seed + 29) - 0.5) * 2.2,
-        Math.sin(angle) * radius,
-      ),
+      statusType: isCoreHub ? 'core_hub' : isEntryPoint ? 'elevated' : isCriticalTarget ? 'hold' : IDENTITY_TYPES.has(asset.asset_type) ? 'cleared' : 'baseline',
+      pos: isCoreHub
+        ? new THREE.Vector3(0, 0, 0)
+        : new THREE.Vector3(
+            Math.cos(angle) * radius * 1.5,
+            (pseudoRandom(seed + 29) - 0.5) * 1.4,
+            Math.sin(angle) * radius * 0.8,
+          ),
       vel: new THREE.Vector3(),
-      size: style.size + asset.criticality * 0.025,
-      color: style.color,
-      glowColor: style.glow,
+      size: (style.size + asset.criticality * 0.022) * (isCoreHub ? 1.55 : 0.9),
+      color: isCoreHub ? '#DDFBFF' : style.color,
+      glowColor: isCoreHub ? '#67E8F9' : style.glow,
       isOutlier: isEntryPoint,
       branchAngle: angle,
+      isCoreHub,
       assetType: asset.asset_type,
       asset,
       isIdentity: IDENTITY_TYPES.has(asset.asset_type),
       isEntryPoint,
       isCriticalTarget,
-      connectedEdgeIds: relationshipsByNode.get(asset.asset_id) || [],
+      connectedEdgeIds,
       events,
       investigationEvents: events.filter((event) => INVESTIGATION_EVENT_TYPES.has(event.event_type)),
     };
@@ -275,7 +286,7 @@ function computeForceLayout(data: ScenarioGraphData): { nodes: SimNode[]; edges:
         statusType: 'baseline',
         color: style.color,
         glowColor: style.glow,
-        curveElevation: (pseudoRandom(hashString(relationship.edge_id)) - 0.5) * 1.5,
+        curveElevation: (pseudoRandom(hashString(relationship.edge_id)) - 0.5) * 0.5,
         lineWidth: 0.7 + relationship.prior_probability * 1.4,
         relationshipType: relationship.relationship_type,
         evidenceBasis: relationship.evidence_basis,
@@ -284,47 +295,63 @@ function computeForceLayout(data: ScenarioGraphData): { nodes: SimNode[]; edges:
       };
     });
 
-  for (let step = 0; step < 300; step += 1) {
-    const temperature = 1 - step / 300;
-    for (let left = 0; left < nodes.length; left += 1) {
-      for (let right = left + 1; right < nodes.length; right += 1) {
-        const delta = nodes[left].pos.clone().sub(nodes[right].pos);
-        const distanceSquared = Math.max(0.3, delta.lengthSq());
-        const force = (11 / distanceSquared) * temperature;
-        delta.normalize().multiplyScalar(force);
-        nodes[left].vel.add(delta);
-        nodes[right].vel.sub(delta);
-      }
+  // Arrange the supplied topology in concentric hop rings around the most
+  // connected asset. This makes the digital twin visually central without
+  // inventing links or changing the candidate relationship dataset.
+  const adjacency = new Map<string, Set<string>>();
+  nodes.forEach((node) => adjacency.set(node.id, new Set()));
+  edges.forEach((edge) => {
+    adjacency.get(edge.source)?.add(edge.target);
+    adjacency.get(edge.target)?.add(edge.source);
+  });
+
+  const depthById = new Map<string, number>();
+  if (hubAssetId) {
+    depthById.set(hubAssetId, 0);
+    const queue = [hubAssetId];
+    for (let cursor = 0; cursor < queue.length; cursor += 1) {
+      const current = queue[cursor];
+      const nextDepth = (depthById.get(current) || 0) + 1;
+      adjacency.get(current)?.forEach((neighbor) => {
+        if (depthById.has(neighbor)) return;
+        depthById.set(neighbor, nextDepth);
+        queue.push(neighbor);
+      });
     }
-
-    edges.forEach((edge) => {
-      const source = nodeById.get(edge.source)!;
-      const target = nodeById.get(edge.target)!;
-      const delta = target.pos.clone().sub(source.pos);
-      const distance = Math.max(0.1, delta.length());
-      const desired = 4.1 + (1 - edge.priorProbability) * 1.8;
-      const force = (distance - desired) * 0.03 * temperature;
-      delta.normalize().multiplyScalar(force);
-      source.vel.add(delta);
-      target.vel.sub(delta);
-    });
-
-    nodes.forEach((node) => {
-      node.vel.add(node.pos.clone().multiplyScalar(-0.0045 * temperature));
-      node.pos.add(node.vel.clone().multiplyScalar(0.45));
-      node.vel.multiplyScalar(0.6);
-      node.pos.y *= 0.992;
-    });
   }
 
-  const box = new THREE.Box3().setFromPoints(nodes.map((node) => node.pos));
-  const center = box.getCenter(new THREE.Vector3());
-  const size = box.getSize(new THREE.Vector3());
+  const connectedMaxDepth = Math.max(0, ...depthById.values());
+  const outerDepth = connectedMaxDepth + 1;
+  const rings = new Map<number, SimNode[]>();
   nodes.forEach((node) => {
-    node.pos.sub(center);
-    node.pos.x *= 40 / Math.max(size.x, 1);
-    node.pos.z *= 22 / Math.max(size.z, 1);
-    node.pos.y *= 8 / Math.max(size.y, 1);
+    const depth = depthById.get(node.id) ?? outerDepth;
+    const ring = rings.get(depth) || [];
+    ring.push(node);
+    rings.set(depth, ring);
+  });
+
+  rings.forEach((ringNodes, depth) => {
+    ringNodes.sort((left, right) => {
+      const degreeDelta = right.connectedEdgeIds.length - left.connectedEdgeIds.length;
+      return degreeDelta || left.id.localeCompare(right.id);
+    });
+    if (depth === 0) {
+      ringNodes[0]?.pos.set(0, 0, 0);
+      return;
+    }
+
+    const radius = 5.1 + (depth - 1) * 5.25;
+    const angleOffset = depth * 0.67;
+    ringNodes.forEach((node, index) => {
+      const angle = angleOffset + (index / Math.max(1, ringNodes.length)) * Math.PI * 2;
+      const seed = hashString(`${data.scenario_id}:${node.id}:radial`);
+      node.pos.set(
+        Math.cos(angle) * radius * 1.55,
+        Math.sin(angle) * radius * 0.68,
+        (pseudoRandom(seed) - 0.5) * 2.6,
+      );
+      node.branchAngle = angle;
+    });
   });
 
   const unresolvedAliases = resolvedEvents.filter(
@@ -337,17 +364,38 @@ function computeForceLayout(data: ScenarioGraphData): { nodes: SimNode[]; edges:
 
 function chooseSimulationRoute(edges: SimEdge[], nodes: SimNode[]): SimEdge[] {
   if (edges.length === 0) return [];
+  const nodeById = new Map(nodes.map((node) => [node.id, node]));
   const entryIds = new Set(nodes.filter((node) => node.isEntryPoint).map((node) => node.id));
-  const orderedStarts = [
-    ...edges.filter((edge) => entryIds.has(edge.source)),
-    ...edges.filter((edge) => !entryIds.has(edge.source)),
-  ];
+  const ranked = [...edges].sort((left, right) => {
+    const edgeLength = (edge: SimEdge) => {
+      const source = nodeById.get(edge.source);
+      const target = nodeById.get(edge.target);
+      if (!source || !target) return 0;
+      return source.pos.distanceTo(target.pos) + (entryIds.has(edge.source) || entryIds.has(edge.target) ? 5 : 0);
+    };
+    return edgeLength(right) - edgeLength(left);
+  });
 
-  for (const first of orderedStarts) {
-    const second = edges.find((edge) => edge.source === first.target && edge.id !== first.id);
-    if (second) return [first, second];
+  // Use one long, real candidate edge so the jump and interception read clearly.
+  return [ranked[0]];
+}
+
+function preventiveMeasureFor(relationshipType: string): string {
+  switch (relationshipType) {
+    case 'AUTHENTICATES_TO':
+    case 'CAN_ASSUME_IDENTITY':
+    case 'HAS_PRIVILEGE':
+      return 'Session suspended and identity route isolated';
+    case 'CAN_ACCESS_DATA':
+      return 'Data transfer blocked and access route isolated';
+    case 'ADMINISTERS':
+    case 'CAN_MODIFY_CONFIGURATION':
+      return 'Privileged action suspended for verification';
+    case 'TRUSTS_SERVICE':
+      return 'Service trust route quarantined for verification';
+    default:
+      return 'Candidate network route isolated for verification';
   }
-  return [orderedStarts[0]];
 }
 
 // ----------------------------------------------------------------------------
@@ -432,7 +480,7 @@ function GlowingCurvedEdge({
     if (trafficActive) {
       trafficRefs.current.forEach((mesh, index) => {
         if (!mesh) return;
-        const t = (clock.getElapsedTime() * (0.12 + index * 0.018) + trafficOffset + index / 3) % 1;
+        const t = (clock.getElapsedTime() * (0.16 + index * 0.016) + trafficOffset + index / 4) % 1;
         mesh.position.copy(curve.getPoint(t));
         const shimmer = 0.78 + Math.sin(clock.getElapsedTime() * 4 + index) * 0.18;
         mesh.scale.setScalar(shimmer);
@@ -441,12 +489,11 @@ function GlowingCurvedEdge({
 
     const stageElapsed = performance.now() / 1000 - stageStartedAt.current;
     if (anomalyStage === 'moving' && anomalyRef.current) {
-      anomalyRef.current.position.copy(curve.getPoint(Math.min(0.96, stageElapsed / 1.35)));
+      anomalyRef.current.position.copy(curve.getPoint(Math.min(1, stageElapsed / 4.15)));
     }
     if (anomalyStage === 'tracking') {
-      const anomalyT = Math.min(0.82, 0.12 + stageElapsed / 1.8);
-      anomalyRef.current?.position.copy(curve.getPoint(anomalyT));
-      trackerRef.current?.position.copy(curve.getPoint(Math.max(0.02, anomalyT - 0.16)));
+      anomalyRef.current?.position.copy(targetPos);
+      trackerRef.current?.position.copy(curve.getPoint(Math.min(1, stageElapsed / 0.9)));
     }
     if (anomalyStage === 'contained' && containmentRingRef.current) {
       containmentRingRef.current.position.copy(targetPos);
@@ -469,24 +516,24 @@ function GlowingCurvedEdge({
       >
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
-      {trafficActive && [0, 1, 2].map((index) => (
+      {trafficActive && [0, 1, 2, 3].map((index) => (
         <mesh key={index} ref={(mesh) => { trafficRefs.current[index] = mesh; }}>
-          <sphereGeometry args={[0.075, 10, 10]} />
+          <sphereGeometry args={[0.07, 10, 10]} />
           <meshBasicMaterial color="#67E8F9" transparent opacity={0.9} blending={THREE.AdditiveBlending} depthWrite={false} />
         </mesh>
       ))}
       {(anomalyStage === 'moving' || anomalyStage === 'tracking') && (
         <mesh ref={anomalyRef}>
-          <sphereGeometry args={[0.2, 18, 18]} />
+          <sphereGeometry args={[0.34, 24, 24]} />
           <meshBasicMaterial color="#FB3B57" transparent opacity={1} blending={THREE.AdditiveBlending} depthWrite={false} />
-          <pointLight color="#FB3B57" intensity={2.4} distance={3.5} />
+          <pointLight color="#FB3B57" intensity={4.2} distance={5.5} />
         </mesh>
       )}
       {anomalyStage === 'tracking' && (
         <mesh ref={trackerRef}>
-          <sphereGeometry args={[0.13, 16, 16]} />
+          <sphereGeometry args={[0.2, 20, 20]} />
           <meshBasicMaterial color="#22D3EE" transparent opacity={1} blending={THREE.AdditiveBlending} depthWrite={false} />
-          <pointLight color="#22D3EE" intensity={2} distance={3} />
+          <pointLight color="#22D3EE" intensity={4} distance={5} />
         </mesh>
       )}
       {anomalyStage === 'contained' && (
@@ -546,7 +593,7 @@ function StarburstNodeMesh({
     }
     if (spriteRef.current && (isEscalated || isCoreHub || isHold)) {
       const pulse = 1 + Math.sin(t * 4) * 0.15;
-      const baseScale = node.size * (isCoreHub ? 6.5 : isEscalated ? 5.5 : 4.0);
+      const baseScale = node.size * (isCoreHub ? 5.2 : isEscalated ? 4.2 : 3.2);
       spriteRef.current.scale.set(baseScale * pulse, baseScale * pulse, 1);
     }
   });
@@ -580,41 +627,29 @@ function StarburstNodeMesh({
       <sprite
         ref={spriteRef}
         scale={[
-          node.size * (isCoreHub ? 6.5 : isEscalated ? 5.5 : isHold ? 4.5 : isElevated ? 4.0 : 3.6),
-          node.size * (isCoreHub ? 6.5 : isEscalated ? 5.5 : isHold ? 4.5 : isElevated ? 4.0 : 3.6),
+          node.size * (isCoreHub ? 5.2 : isEscalated ? 4.2 : isHold ? 3.5 : isElevated ? 3.2 : 2.2),
+          node.size * (isCoreHub ? 5.2 : isEscalated ? 4.2 : isHold ? 3.5 : isElevated ? 3.2 : 2.2),
           1,
         ]}
       >
         <spriteMaterial
           map={glowTexture}
           transparent
-          opacity={isEscalated ? 0.9 : isCoreHub ? 0.85 : isHold ? 0.7 : hovered ? 0.8 : isElevated ? 0.6 : 0.4}
+          opacity={isEscalated ? 0.72 : isCoreHub ? 0.68 : isHold ? 0.48 : hovered ? 0.62 : isElevated ? 0.42 : 0.2}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
         />
       </sprite>
 
-      {/* 2. Core Solid Sphere Mesh */}
+      {/* 2. Unified circular entity mesh; color and hover details carry type. */}
       <mesh>
-        {node.isIdentity ? (
-          <sphereGeometry args={[node.size, 32, 32]} />
-        ) : node.assetType === 'database' ? (
-          <cylinderGeometry args={[node.size * 0.9, node.size * 0.9, node.size * 1.35, 24]} />
-        ) : node.assetType === 'application' ? (
-          <octahedronGeometry args={[node.size, 0]} />
-        ) : node.assetType === 'external_entry' ? (
-          <coneGeometry args={[node.size, node.size * 1.6, 24]} />
-        ) : node.assetType === 'security_infrastructure' ? (
-          <dodecahedronGeometry args={[node.size, 0]} />
-        ) : (
-          <boxGeometry args={[node.size * 1.35, node.size, node.size * 1.1]} />
-        )}
+        <sphereGeometry args={[node.size, 32, 32]} />
         <meshStandardMaterial
           color={hovered || isSelected ? '#FFFFFF' : node.color}
           emissive={node.glowColor}
-          emissiveIntensity={hovered || isSelected ? 3.2 : isEscalated ? 2.5 : isCoreHub ? 2.2 : isElevated ? 1.8 : 1.3}
-          roughness={0.15}
-          metalness={0.8}
+          emissiveIntensity={hovered || isSelected ? 2.8 : isEscalated ? 2.1 : isCoreHub ? 1.9 : isElevated ? 1.45 : 0.95}
+          roughness={0.28}
+          metalness={0.62}
         />
       </mesh>
 
@@ -628,6 +663,19 @@ function StarburstNodeMesh({
             transparent
             opacity={isEscalated ? 0.85 : isCoreHub ? 0.6 : hovered ? 0.9 : 0.55}
             blending={THREE.AdditiveBlending}
+          />
+        </mesh>
+      )}
+      {isCoreHub && (
+        <mesh>
+          <ringGeometry args={[node.size * 1.88, node.size * 2.04, 48]} />
+          <meshBasicMaterial
+            color="#67E8F9"
+            side={THREE.DoubleSide}
+            transparent
+            opacity={0.32}
+            blending={THREE.AdditiveBlending}
+            depthWrite={false}
           />
         </mesh>
       )}
@@ -660,10 +708,11 @@ function ScreenProjector({
       const isVisible = v.z < 1;
       const rawX = (v.x * 0.5 + 0.5) * size.width;
       const rawY = (-(v.y * 0.5) + 0.5) * size.height;
-      const x = Math.max(70, Math.min(size.width - 70, rawX));
-      const y = Math.max(34, Math.min(size.height - 34, rawY));
-
-      projected[n.id] = { x, y, visible: isVisible };
+      projected[n.id] = {
+        x: Math.max(28, Math.min(size.width - 28, rawX)),
+        y: Math.max(28, Math.min(size.height - 28, rawY)),
+        visible: isVisible,
+      };
     });
 
     onPositionsUpdated(projected);
@@ -732,8 +781,8 @@ function ResponsiveCameraController({
     const padding = aspect > 2.0 ? 1.1 : aspect > 1.3 ? 1.14 : 1.2;
     const distForWidth = ((bounds.width * padding) / 2) / (tanHalfFov * aspect);
 
-    // Camera pitch ~ 24 degrees looking down
-    const pitch = 0.55;
+    // A shallow pitch keeps the topology wide and diagram-like while retaining depth.
+    const pitch = 0.32;
     const effectiveDepth = bounds.depth * Math.cos(pitch) + bounds.height * Math.sin(pitch);
     const distForHeight = ((effectiveDepth * padding) / 2) / tanHalfFov;
 
@@ -777,7 +826,7 @@ export function Network3DGraph({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(selectedEntityId || null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
-  const [simulationPhase, setSimulationPhase] = useState<SimulationPhase>('idle');
+  const [simulationPhase, setSimulationPhase] = useState<SimulationPhase>('telemetry');
   const [projectedPositions, setProjectedPositions] = useState<
     Record<string, { x: number; y: number; visible: boolean }>
   >({});
@@ -797,7 +846,7 @@ export function Network3DGraph({
     setSelectedNodeId(null);
     setSelectedEdgeId(null);
     clearSimulationTimers();
-    setSimulationPhase('idle');
+    setSimulationPhase('telemetry');
     loadScenarioGraphData(scenarioId)
       .then((data) => {
         if (!cancelled) setGraphData(data);
@@ -828,9 +877,29 @@ export function Network3DGraph({
     [simulationRoute],
   );
   const trafficEdgeIds = useMemo(() => {
-    const preferred = edges.filter((edge, index) => edge.evidenceBasis === 'configured' || index % 3 === 0);
-    return new Set(preferred.slice(0, 18).map((edge) => edge.id));
+    return new Set(edges.map((edge) => edge.id));
   }, [edges]);
+
+  const simulationRouteKey = simulationRoute.map((edge) => edge.id).join(':');
+
+  useEffect(() => {
+    clearSimulationTimers();
+    if (!graphData || simulationRoute.length === 0) return;
+
+    const scheduleCycle = () => {
+      simulationTimersRef.current = [];
+      setSimulationPhase('telemetry');
+      simulationTimersRef.current.push(
+        setTimeout(() => setSimulationPhase('anomaly'), 6000),
+        setTimeout(() => setSimulationPhase('tracking'), 10500),
+        setTimeout(() => setSimulationPhase('contained'), 11800),
+        setTimeout(scheduleCycle, 18000),
+      );
+    };
+
+    scheduleCycle();
+    return clearSimulationTimers;
+  }, [graphData, scenarioId, simulationRouteKey]);
 
   const selectedNode = useMemo(
     () => nodes.find((node) => node.id === selectedNodeId) || null,
@@ -842,30 +911,19 @@ export function Network3DGraph({
   );
   const inspectedNode = hoveredNode || selectedNode;
   const assetName = (assetId: string) => nodes.find((node) => node.id === assetId)?.name || assetId;
+  const containmentEdge = simulationRoute[simulationRoute.length - 1] || null;
+  const containmentTarget = containmentEdge ? nodes.find((node) => node.id === containmentEdge.target) || null : null;
+  const phasePresentation: Record<SimulationPhase, { label: string; detail: string; tone: string; dot: string }> = {
+    idle: { label: 'Digital twin ready', detail: 'Waiting for topology', tone: 'text-zinc-300', dot: 'bg-zinc-500' },
+    telemetry: { label: 'Live telemetry exchange', detail: 'Learning normal movement across the twin', tone: 'text-cyan-200', dot: 'bg-cyan-300' },
+    anomaly: { label: 'Anomaly moving', detail: 'Unexpected transfer detected · one jump observed', tone: 'text-rose-200', dot: 'bg-rose-400' },
+    tracking: { label: 'Twin interceptor deployed', detail: 'Blue twin is closing on the anomaly', tone: 'text-sky-200', dot: 'bg-sky-300' },
+    contained: { label: 'Movement contained', detail: 'Origin identified · preventive measure applied', tone: 'text-emerald-200', dot: 'bg-emerald-300' },
+  };
+  const currentPhase = phasePresentation[simulationPhase];
 
   const handleResetCamera = () => {
     setResetTrigger((prev) => prev + 1);
-  };
-
-  const runTwinSimulation = () => {
-    if (simulationRoute.length === 0) return;
-    clearSimulationTimers();
-    setSelectedNodeId(null);
-    setSelectedEdgeId(null);
-    setSimulationPhase('telemetry');
-    simulationTimersRef.current = [
-      setTimeout(() => setSimulationPhase('anomaly'), 2400),
-      setTimeout(() => setSimulationPhase('tracking'), 3850),
-      setTimeout(() => setSimulationPhase('contained'), 5550),
-    ];
-  };
-
-  const simulationCopy: Record<SimulationPhase, { title: string; detail: string; color: string }> = {
-    idle: { title: 'Twin simulation ready', detail: 'Illustrative demo using existing candidate relationships.', color: 'text-zinc-400' },
-    telemetry: { title: 'Baseline telemetry streaming', detail: 'Normal synthetic transfers are moving between entities.', color: 'text-cyan-300' },
-    anomaly: { title: 'Synthetic anomaly introduced', detail: 'Demo signal is attempting movement across one candidate link.', color: 'text-rose-300' },
-    tracking: { title: 'Digital twin tracking movement', detail: 'The cyan tracker is correlating the synthetic signal.', color: 'text-cyan-300' },
-    contained: { title: 'Synthetic movement contained', detail: 'Digital twin intercepted the demo signal. No compromise is asserted.', color: 'text-emerald-300' },
   };
 
   return (
@@ -916,7 +974,7 @@ export function Network3DGraph({
                 sourcePos={srcPos}
                 targetPos={tgtPos}
                 selected={edge.id === selectedEdgeId}
-                trafficActive={simulationPhase !== 'idle' && trafficEdgeIds.has(edge.id)}
+                trafficActive={trafficEdgeIds.has(edge.id)}
                 trafficOffset={(hashString(edge.id) % 100) / 100}
                 anomalyStage={(() => {
                   const routeIndex = simulationRouteIndex.get(edge.id);
@@ -961,16 +1019,27 @@ export function Network3DGraph({
           const pos = projectedPositions[node.id];
           if (!pos || !pos.visible) return null;
 
-          const isSelected = selectedNodeId === node.id;
-          const labelSeed = hashString(node.id);
-          const labelOffsetX = labelSeed % 3 === 0 ? -12 : labelSeed % 3 === 1 ? 12 : 0;
-          const labelOffsetY = labelSeed % 2 === 0 ? 27 : -27;
+          const isHovered = hoveredNode?.id === node.id;
+          if (!isHovered && !node.isIdentity) return null;
 
+          if (!isHovered) {
+            return (
+              <div
+                key={node.id}
+                style={{ transform: `translate3d(${pos.x}px, ${pos.y}px, 0) translate(-50%, -50%)` }}
+                className="pointer-events-none absolute z-10 rounded-full bg-[#07101a]/90 p-0.5 shadow-[0_0_14px_rgba(56,189,248,0.28)] ring-1 ring-sky-400/35"
+              >
+                <PersonaAvatar id={node.id} name={node.name} size="xs" status="baseline" showBorder={false} />
+              </div>
+            );
+          }
+
+          const isSelected = selectedNodeId === node.id;
           return (
             <div
               key={node.id}
               style={{
-                transform: `translate3d(${pos.x + labelOffsetX}px, ${pos.y + labelOffsetY}px, 0) translate(-50%, -50%)`,
+                transform: `translate3d(${pos.x}px, ${pos.y + 25}px, 0) translate(-50%, -50%)`,
               }}
               onClick={(e) => {
                 e.stopPropagation();
@@ -979,7 +1048,7 @@ export function Network3DGraph({
               }}
               onMouseEnter={() => setHoveredNode(node)}
               onMouseLeave={() => setHoveredNode(null)}
-              className={`pointer-events-auto absolute cursor-pointer select-none transition-all duration-75 rounded-full text-[10px] font-mono whitespace-nowrap shadow-2xl flex items-center gap-1.5 border backdrop-blur-md px-2 py-0.5 ${
+              className={`pointer-events-auto absolute cursor-pointer select-none transition-all duration-100 rounded-full text-[10px] font-mono whitespace-nowrap shadow-[0_8px_26px_rgba(0,0,0,0.6)] flex items-center gap-1.5 border backdrop-blur-md px-2 py-1 ${
                 isSelected
                   ? 'bg-zinc-900 border-[#C6613F] text-white ring-2 ring-[#C6613F]/50 scale-105 z-30'
                   : node.isEntryPoint
@@ -1009,6 +1078,27 @@ export function Network3DGraph({
         })}
       </div>
 
+      {/* Persistent narrative makes the autonomous detection loop legible in a demo. */}
+      <div className="pointer-events-none absolute left-1/2 top-4 z-20 w-[410px] max-w-[calc(100%_-_24rem)] -translate-x-1/2 rounded-xl border border-white/10 bg-black/75 px-4 py-2.5 font-mono shadow-[0_12px_36px_rgba(0,0,0,0.45)] backdrop-blur-md">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${currentPhase.dot} animate-pulse shadow-[0_0_14px_currentColor]`} />
+            <div className="min-w-0">
+              <div className={`truncate text-[10px] font-bold uppercase tracking-[0.14em] ${currentPhase.tone}`}>{currentPhase.label}</div>
+              <div className="mt-0.5 truncate text-[9px] text-zinc-400">{currentPhase.detail}</div>
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-1 text-[7px] uppercase tracking-wider text-zinc-600">
+            {(['telemetry', 'anomaly', 'tracking', 'contained'] as SimulationPhase[]).map((phase, index) => (
+              <React.Fragment key={phase}>
+                {index > 0 && <span className="h-px w-3 bg-white/10" />}
+                <span className={`h-1.5 w-1.5 rounded-full ${simulationPhase === phase ? phasePresentation[phase].dot : 'bg-zinc-700'}`} />
+              </React.Fragment>
+            ))}
+          </div>
+        </div>
+      </div>
+
       {/* Graph Floating Controls Bar */}
       <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
         <span className="px-2.5 py-1.5 rounded-lg text-[10px] font-mono bg-black/70 border border-white/10 text-zinc-300 backdrop-blur-md">
@@ -1024,16 +1114,6 @@ export function Network3DGraph({
             <span>Reseed Dataset</span>
           </button>
         )}
-
-        <button
-          onClick={runTwinSimulation}
-          disabled={!graphData || simulationRoute.length === 0}
-          className="group flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-mono font-semibold bg-cyan-400/10 hover:bg-cyan-400/20 text-cyan-100 border border-cyan-400/35 hover:border-cyan-300/60 transition-all shadow-[0_0_24px_rgba(34,211,238,0.08)] backdrop-blur-md cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-          title="Run an illustrative digital-twin telemetry and containment sequence"
-        >
-          {simulationPhase === 'contained' ? <ShieldCheck className="w-3.5 h-3.5 text-emerald-300" /> : <Play className="w-3.5 h-3.5 fill-cyan-300/30" />}
-          <span>{simulationPhase === 'idle' ? 'Run Twin Simulation' : simulationPhase === 'contained' ? 'Replay Simulation' : 'Restart Simulation'}</span>
-        </button>
 
         <button
           onClick={() => setAutoRotate(!autoRotate)}
@@ -1056,19 +1136,37 @@ export function Network3DGraph({
         </button>
       </div>
 
-      {simulationPhase !== 'idle' && (
-        <div className="absolute bottom-4 right-4 z-20 w-[320px] max-w-[calc(100%_-_2rem)] rounded-xl border border-white/10 bg-zinc-950/90 px-4 py-3 font-mono shadow-2xl backdrop-blur-md">
-          <div className="flex items-center gap-3">
-            <div className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full border ${simulationPhase === 'contained' ? 'border-emerald-400/50 bg-emerald-400/10' : simulationPhase === 'anomaly' ? 'border-rose-400/50 bg-rose-400/10' : 'border-cyan-400/50 bg-cyan-400/10'}`}>
-              {simulationPhase === 'contained' ? <ShieldCheck className="h-4 w-4 text-emerald-300" /> : <span className={`h-2.5 w-2.5 rounded-full ${simulationPhase === 'anomaly' ? 'bg-rose-400' : 'bg-cyan-300'} animate-pulse`} />}
+      {simulationPhase === 'contained' && containmentEdge && containmentTarget && (
+        <div className="absolute bottom-4 right-4 z-20 w-[360px] max-w-[calc(100%_-_2rem)] overflow-hidden rounded-xl border border-emerald-400/25 bg-zinc-950/95 font-mono shadow-[0_0_40px_rgba(16,185,129,0.08)] backdrop-blur-md animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-emerald-400/40 bg-emerald-400/10">
+              <ShieldCheck className="h-4 w-4 text-emerald-300" />
             </div>
             <div className="min-w-0">
-              <div className={`text-[11px] font-bold ${simulationCopy[simulationPhase].color}`}>{simulationCopy[simulationPhase].title}</div>
-              <div className="mt-0.5 text-[9px] leading-relaxed text-zinc-500">{simulationCopy[simulationPhase].detail}</div>
+              <div className="text-[9px] uppercase tracking-[0.16em] text-emerald-400">Preventive measure applied</div>
+              <div className="mt-1 text-[11px] font-semibold text-zinc-100">{preventiveMeasureFor(containmentEdge.relationshipType)}</div>
             </div>
           </div>
-          <div className="mt-2.5 flex items-center gap-1.5 text-[8px] uppercase tracking-[0.14em] text-zinc-600">
-            <span className="text-zinc-500">Demo</span><span>•</span><span>synthetic signal</span><span>•</span><span>candidate links</span>
+
+          <div className="px-4 py-3">
+            <div className="mb-3 truncate text-[9px] text-zinc-500">
+              {assetName(containmentEdge.source)} → {containmentTarget.name}
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-lg border border-rose-400/15 bg-rose-400/[0.04] p-2.5">
+                <div className="text-[8px] uppercase tracking-wider text-zinc-500">Risk score</div>
+                <div className="mt-1 text-sm font-bold text-zinc-300">Not scored</div>
+                <div className="mt-1 text-[8px] text-rose-300/80">Candidate prior {Math.round(containmentEdge.priorProbability * 100)}%</div>
+              </div>
+              <div className="rounded-lg border border-cyan-400/15 bg-cyan-400/[0.04] p-2.5">
+                <div className="text-[8px] uppercase tracking-wider text-zinc-500">Trust score</div>
+                <div className="mt-1 text-sm font-bold text-zinc-300">Not scored</div>
+                <div className="mt-1 text-[8px] text-cyan-300/80">Evidence coverage {Math.round(containmentTarget.asset.evidence_coverage * 100)}%</div>
+              </div>
+            </div>
+            <div className="mt-2.5 text-[8px] leading-relaxed text-zinc-600">
+              Automated response is simulated. Scores remain unassigned until supplied by the backend model.
+            </div>
           </div>
         </div>
       )}
@@ -1097,54 +1195,36 @@ export function Network3DGraph({
       </div>
 
       {(inspectedNode || selectedEdge) && (
-        <div className="absolute top-4 left-4 z-20 p-4 rounded-xl bg-zinc-950/95 border border-white/15 backdrop-blur-md shadow-2xl text-xs font-mono w-[360px] max-w-[calc(100%_-_2rem)] max-h-[560px] overflow-y-auto animate-in fade-in duration-150">
+        <div className="absolute top-4 left-4 z-20 w-[300px] max-w-[calc(100%_-_2rem)] rounded-xl border border-white/15 bg-zinc-950/95 p-4 font-mono shadow-2xl backdrop-blur-md animate-in fade-in duration-150">
           {selectedEdge ? (
             <>
-              <div className="text-[10px] uppercase tracking-wider text-violet-300 mb-2">Candidate relationship</div>
-              <h4 className="font-bold text-white text-sm">{selectedEdge.relationshipType.replaceAll('_', ' ')}</h4>
-              <p className="mt-1 text-zinc-300">{assetName(selectedEdge.source)} → {assetName(selectedEdge.target)}</p>
-              <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-white/10">
-                <div><span className="text-zinc-500">Evidence basis</span><div className="text-zinc-200">{selectedEdge.evidenceBasis}</div></div>
-                <div><span className="text-zinc-500">Prior estimate</span><div className="text-zinc-200">{Math.round(selectedEdge.priorProbability * 100)}%</div></div>
+              <div className="mb-2 text-[11px] uppercase tracking-wider text-violet-300">Candidate connection</div>
+              <h4 className="text-base font-bold text-white">{selectedEdge.relationshipType.replaceAll('_', ' ')}</h4>
+              <p className="mt-1 text-sm leading-snug text-zinc-300">{assetName(selectedEdge.source)} → {assetName(selectedEdge.target)}</p>
+              <div className="mt-3 grid grid-cols-2 gap-2 border-t border-white/10 pt-3 text-xs">
+                <div><span className="text-zinc-500">Evidence</span><div className="mt-1 text-zinc-200">{selectedEdge.evidenceBasis}</div></div>
+                <div><span className="text-zinc-500">Prior estimate</span><div className="mt-1 text-zinc-200">{Math.round(selectedEdge.priorProbability * 100)}%</div></div>
               </div>
-              <p className="mt-3 text-[10px] text-amber-200/80">A prior is an initial estimate only; it does not establish reachability or compromise.</p>
-              <div className="mt-3 pt-3 border-t border-white/10">
-                <div className="text-zinc-400 mb-2">Matching events ({selectedEdge.events.length})</div>
-                {selectedEdge.events.slice(0, 5).map((event) => (
-                  <div key={event.event_id} className="mb-2 rounded bg-white/[0.04] p-2">
-                    <div className="text-zinc-200">{event.event_type.replaceAll('_', ' ')}</div>
-                    <div className="text-[9px] text-zinc-500">{formatScenarioTimestamp(event.timestamp)} · {event.source}</div>
-                  </div>
-                ))}
-                {selectedEdge.events.length === 0 && <p className="text-zinc-500">No raw event resolves uniquely to both endpoints.</p>}
-              </div>
+              <p className="mt-3 text-[11px] leading-relaxed text-amber-200/80">Prior estimate only · {selectedEdge.events.length} matching events</p>
             </>
           ) : inspectedNode ? (
             <>
-          <div className="flex items-start gap-3 mb-2.5">
+          <div className="mb-3 flex items-center gap-3">
             {inspectedNode.isIdentity ? <PersonaAvatar id={inspectedNode.id} name={inspectedNode.name} size="md" status="baseline" /> : <div className="w-9 h-9 rounded-lg bg-white/10 flex items-center justify-center text-[10px] font-bold">{inspectedNode.assetType.slice(0, 3).toUpperCase()}</div>}
             <div className="min-w-0 flex-1">
-              <h4 className="font-bold text-white text-xs truncate">{inspectedNode.name}</h4>
-              <p className="text-[10px] text-zinc-400">{inspectedNode.assetType.replaceAll('_', ' ')}</p>
-              <p className="text-[10px] text-zinc-500">{inspectedNode.id} · {inspectedNode.asset.zone}</p>
+              <h4 className="truncate text-base font-bold text-white">{inspectedNode.name}</h4>
+              <p className="text-xs capitalize text-zinc-400">{inspectedNode.assetType.replaceAll('_', ' ')} · {inspectedNode.asset.zone}</p>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/10 text-[10px]">
-            <div><span className="text-zinc-500">Exposure</span><div className="text-zinc-200">{inspectedNode.asset.exposure}</div></div>
-            <div><span className="text-zinc-500">Criticality</span><div className="text-zinc-200">{inspectedNode.asset.criticality}/5</div></div>
-            <div><span className="text-zinc-500">Evidence coverage</span><div className="text-zinc-200">{Math.round(inspectedNode.asset.evidence_coverage * 100)}%</div></div>
-            <div><span className="text-zinc-500">Relationships</span><div className="text-zinc-200">{inspectedNode.connectedEdgeIds.length}</div></div>
+          <div className="grid grid-cols-3 gap-2 border-t border-white/10 pt-3 text-xs">
+            <div><span className="text-zinc-500">Exposure</span><div className="mt-1 capitalize text-zinc-100">{inspectedNode.asset.exposure}</div></div>
+            <div><span className="text-zinc-500">Criticality</span><div className="mt-1 text-zinc-100">{inspectedNode.asset.criticality}/5</div></div>
+            <div><span className="text-zinc-500">Links</span><div className="mt-1 text-zinc-100">{inspectedNode.connectedEdgeIds.length}</div></div>
           </div>
-          {(inspectedNode.asset.email || inspectedNode.asset.hostname || inspectedNode.asset.ip_address) && (
-            <p className="mt-3 text-[10px] text-zinc-400 break-all">
-              {inspectedNode.asset.email || inspectedNode.asset.hostname || inspectedNode.asset.ip_address}
-            </p>
-          )}
-          {inspectedNode.asset.security_controls.length > 0 && <p className="mt-3 text-[10px] text-zinc-400">Controls: {inspectedNode.asset.security_controls.join(', ')}</p>}
           <div className="mt-3 pt-3 border-t border-white/10">
-            <div className="text-zinc-300 mb-2">Connected candidate relationships</div>
-            {edges.filter((edge) => inspectedNode.connectedEdgeIds.includes(edge.id)).slice(0, 5).map((edge) => (
+            <div className="mb-2 text-xs text-zinc-400">Connected paths</div>
+            {edges.filter((edge) => inspectedNode.connectedEdgeIds.includes(edge.id)).slice(0, 2).map((edge) => (
               <button
                 key={edge.id}
                 onClick={() => {
@@ -1152,24 +1232,16 @@ export function Network3DGraph({
                   setSelectedNodeId(null);
                   setHoveredNode(null);
                 }}
-                className="w-full text-left mb-1.5 rounded bg-white/[0.04] hover:bg-white/[0.08] p-2 cursor-pointer"
+                className="mb-1.5 w-full cursor-pointer rounded-lg bg-white/[0.04] p-2.5 text-left hover:bg-white/[0.08]"
               >
-                <div className="text-zinc-200">{edge.relationshipType.replaceAll('_', ' ')}</div>
-                <div className="text-[9px] text-zinc-500 truncate">{assetName(edge.source)} → {assetName(edge.target)} · prior {Math.round(edge.priorProbability * 100)}%</div>
+                <div className="text-xs text-zinc-100">{edge.relationshipType.replaceAll('_', ' ')}</div>
+                <div className="mt-1 truncate text-[10px] text-zinc-500">Prior {Math.round(edge.priorProbability * 100)}% · {assetName(edge.target)}</div>
               </button>
             ))}
           </div>
-          <div className="mt-3 pt-3 border-t border-white/10">
-            <div className="flex items-center justify-between mb-2"><span className="text-zinc-300">Investigation context</span><span className="text-amber-300">{inspectedNode.investigationEvents.length} review signals</span></div>
-            <p className="text-[9px] text-zinc-500 mb-2">Event type and fields warrant review; they do not confirm compromise.</p>
-            {inspectedNode.investigationEvents.slice(0, 4).map((event) => (
-              <div key={event.event_id} className="mb-2 rounded bg-white/[0.04] p-2">
-                <div className="text-zinc-200">{event.event_type.replaceAll('_', ' ')}</div>
-                <div className="text-[9px] text-zinc-500">{formatScenarioTimestamp(event.timestamp)} · {event.source}</div>
-                <div className="text-[9px] text-zinc-400 mt-1 truncate">{Object.entries(event.observed_fields).slice(0, 3).map(([key, value]) => `${key}: ${value}`).join(' · ')}</div>
-              </div>
-            ))}
-            {inspectedNode.investigationEvents.length === 0 && <p className="text-zinc-500">No review-signal event types resolve uniquely to this entity.</p>}
+          <div className="mt-3 flex items-center justify-between border-t border-white/10 pt-3 text-xs">
+            <span className="text-zinc-400">Signals for review</span>
+            <span className={inspectedNode.investigationEvents.length ? 'text-amber-300' : 'text-emerald-300'}>{inspectedNode.investigationEvents.length}</span>
           </div>
             </>
           ) : null}

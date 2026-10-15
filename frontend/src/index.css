@@ -25,6 +25,27 @@
 .font-editorial{font-family:"Federant","Cormorant Garamond",Georgia,"Times New Roman",serif}.font-serif-sub{font-family:"Cormorant Garamond",Georgia,"Times New Roman",serif}.font-sans-tech{font-family:"Plus Jakarta Sans",ui-sans-serif,system-ui,sans-serif}.font-mono-tech{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace}
 .ikori-product-bridge{background:radial-gradient(circle at 50% 0,rgba(101,11,23,.2),transparent 42%),linear-gradient(180deg,rgba(17,8,8,.97),#060608 62%)}
 
+/* Product-console interpretation of the editorial IKORI hero palette. */
+.product-theme-royal body{background:#100708;color:#ede9d5}
+.product-theme-royal .ikori-console{
+  background:
+    radial-gradient(circle at 76% 8%,rgba(116,18,31,.2),transparent 30%),
+    radial-gradient(circle at 18% 42%,rgba(71,12,20,.16),transparent 36%),
+    linear-gradient(180deg,#100708 0%,#090607 52%,#060608 100%)!important;
+  color:#ede9d5;
+}
+.product-theme-royal .ikori-console::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.2;background-image:radial-gradient(rgba(227,19,43,.22) .6px,transparent .6px);background-size:7px 7px;mask-image:linear-gradient(to bottom,black,transparent 70%)}
+.product-theme-royal .ikori-console>header,.product-theme-royal .ikori-console>main{position:relative;z-index:1}
+.product-theme-royal .ikori-product-header{background:rgba(12,5,7,.92)!important;border-color:rgba(227,19,43,.22)!important;box-shadow:0 12px 40px rgba(0,0,0,.34)}
+.product-theme-royal .ikori-product-nav{background:rgba(26,11,14,.9)!important;border-color:rgba(227,19,43,.25)!important}
+.product-theme-royal .ikori-product-nav button.bg-\[\#C6613F\]{background:#e3132b!important;color:#fff7e4!important;box-shadow:0 0 22px rgba(227,19,43,.24)}
+.product-theme-royal .ikori-product-header strong,.product-theme-royal .ikori-console h1,.product-theme-royal .ikori-console h2,.product-theme-royal .ikori-console h3{color:#f4efdc}
+.product-theme-royal .ikori-access-workspace>div,
+.product-theme-royal .ikori-operations-panel{background:linear-gradient(145deg,rgba(27,11,14,.96),rgba(12,6,8,.97))!important;border-color:rgba(227,19,43,.24)!important;box-shadow:0 22px 60px rgba(0,0,0,.3),inset 0 1px rgba(255,240,218,.035)}
+.product-theme-royal .ikori-operations-panel>header{background:linear-gradient(90deg,rgba(78,11,22,.16),transparent 60%)}
+.product-theme-royal .ikori-operations-panel button.bg-\[\#C6613F\]{background:#e3132b!important;color:#fff7e4!important}
+.product-theme-royal .ikori-access-workspace .text-white,.product-theme-royal .ikori-operations-panel .text-white{color:#f4efdc!important}
+
 /* Custom Gooey Filter utility */
 .gooey-filter {
   filter: url(#gooey);
@@ -114,6 +135,46 @@
   }
 }
 
+@keyframes anomalyMapFlow {
+  to {
+    stroke-dashoffset: -44;
+  }
+}
+
+@keyframes twinMapTrace {
+  to {
+    stroke-dashoffset: 42;
+  }
+}
+
+@keyframes twinMapContainment {
+  0% {
+    r: 7;
+    opacity: 1;
+  }
+  100% {
+    r: 34;
+    opacity: 0;
+  }
+}
+
+@keyframes metricRailScan {
+  0% {
+    transform: translateX(-120%);
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(520%);
+    opacity: 0;
+  }
+}
+
 .animate-radar-pulse {
   animation: threatRadarPulse 2.2s cubic-bezier(0.15, 0.75, 0.35, 1) infinite;
 }
@@ -125,6 +186,24 @@
 .animate-telemetry-flow {
   stroke-dasharray: 6 6;
   animation: telemetryDash 1.2s linear infinite;
+}
+
+.animate-anomaly-flow {
+  animation: anomalyMapFlow 0.9s linear infinite;
+}
+
+.animate-twin-trace {
+  animation: twinMapTrace 0.62s linear infinite;
+}
+
+.animate-twin-containment {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: twinMapContainment 1.65s ease-out infinite;
+}
+
+.ikori-metric-scan {
+  animation: metricRailScan 7s ease-in-out infinite;
 }
 
 /* Smooth custom scrollbar for dark background */

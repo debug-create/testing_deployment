@@ -38,7 +38,6 @@ import {
   TrendingDown,
   Sun,
   Moon,
-  Laptop,
 } from 'lucide-react';
 import { Entity, CaseStatus } from '../types';
 import {
@@ -146,7 +145,7 @@ export function CaseDetailPage({
   };
 
   return (
-    <div className={`min-h-screen font-sans pb-16 transition-colors duration-200 ${
+    <div className={`ikori-console min-h-screen font-sans pb-16 transition-colors duration-500 ${
       resolvedTheme === 'dark' ? 'bg-[#050508] text-zinc-100' : 'bg-zinc-50 text-zinc-900'
     }`}>
       {/* Top Header & Breadcrumb Bar */}
@@ -214,11 +213,12 @@ export function CaseDetailPage({
                 <Sun className="w-3.5 h-3.5" />
               </button>
               <button
-                onClick={() => setTheme('system')}
-                title="System preference"
-                className={`p-1 rounded cursor-pointer ${theme === 'system' ? 'bg-[#C6613F] text-black' : 'text-zinc-400'}`}
+                onClick={() => setTheme('royal')}
+                title="IKORI Royal palette"
+                aria-label="Use IKORI Royal palette"
+                className={`p-1 rounded cursor-pointer ${theme === 'royal' ? 'bg-[#E3132B] text-[#FFF7E4] shadow-[0_0_18px_rgba(227,19,43,0.4)]' : 'text-zinc-400'}`}
               >
-                <Laptop className="w-3.5 h-3.5" />
+                <Sparkles className="w-3.5 h-3.5" />
               </button>
             </div>
 

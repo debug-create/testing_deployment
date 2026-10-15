@@ -1,20 +1,17 @@
 // OrgOverview.tsx
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { lazy, Suspense, useState, useEffect, useMemo } from 'react';
 import { Entity, CaseStatus } from '../types';
 import { ComparisonStrip } from './ComparisonStrip';
 import { StatusBadge } from './StatusBadge';
 import { ContextualizedDrawer } from './ContextualizedDrawer';
-import { EscalationToast } from './EscalationToast';
 import { CaseDetailDrawer } from './CaseDetailDrawer';
-import { ThreatMap } from './ThreatMap';
-import { Network3DGraph } from './Network3DGraph';
 import { PersonaAvatar } from './PersonaAvatar';
-import { soundEngine, playAnomalyChime } from '../utils/audioAlert';
 import { useAppMode } from '../caseHooks';
 import { useTheme } from '../useTheme';
-import { AccessRequestsView } from './AccessRequestsView';
-import { JITNotificationToast } from './JITNotificationToast';
 import { RECORDING_MODE_BADGE } from '../constants';
+import { IKORI_PERSONAS } from '../data/identityAliases';
+import { ScenarioOperationsPanel } from './ScenarioOperationsPanel';
+import { ProductBrand, ProductHeaderFrame, ProductNavigation } from './ProductNavigation';
 import {
   Bell,
   Shield,
@@ -39,16 +36,21 @@ import {
   ToggleRight,
   Sun,
   Moon,
-  Laptop,
+  Sparkles,
   Box,
-  Volume2,
-  VolumeX,
   RotateCcw,
   Key,
   Clock,
   BarChart3,
 } from 'lucide-react';
 import { SCENARIO_INTELLIGENCE_CATALOG } from '../data/model_input/loadScenarioIntelligence';
+import { parseProductView } from '../routing';
+
+const ThreatMap = lazy(() => import('./ThreatMap').then((module) => ({ default: module.ThreatMap })));
+const Network3DGraph = lazy(() => import('./Network3DGraph').then((module) => ({ default: module.Network3DGraph })));
+const AccessRequestsView = lazy(() => import('./AccessRequestsView').then((module) => ({ default: module.AccessRequestsView })));
+const ScenarioAssetMatrix = lazy(() => import('./ScenarioAssetMatrix').then((module) => ({ default: module.ScenarioAssetMatrix })));
+const ViewFallback = () => <div className="flex min-h-[420px] items-center justify-center rounded-2xl border border-white/10 bg-[#07070a] font-mono text-xs text-zinc-500">Loading workspace view…</div>;
 
 // Dev-only controls flag (hidden from visible product UI by default)
 const SHOW_DEV_CONTROLS = import.meta.env.DEV && import.meta.env.VITE_ENABLE_DEV_RESEED === 'true';
@@ -112,35 +114,13 @@ export function OrgOverview({
 
   // View mode switcher: '3d-graph' | 'threat-map' | 'matrix' | 'access-requests'
   const [activeView, setActiveView] = useState<'3d-graph' | 'threat-map' | 'matrix' | 'access-requests'>(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const viewParam = params.get('view');
-      if (viewParam === '3d-graph' || viewParam === '3d') return '3d-graph';
-      if (viewParam === 'threat-map' || viewParam === 'map') return 'threat-map';
-      if (viewParam === 'matrix' || viewParam === 'topology') return 'matrix';
-      if (viewParam === 'access-requests' || viewParam === 'jit' || viewParam === 'access') return 'access-requests';
-    }
-    return initialView;
+    return typeof window !== 'undefined' ? parseProductView(window.location.search, initialView) : initialView;
   });
   const [selectedScenarioId, setSelectedScenarioId] = useState(
     SCENARIO_INTELLIGENCE_CATALOG.default_scenario_id
   );
 
-  // Audio alert mute toggle state
-  const [isAudioMuted, setIsAudioMuted] = useState<boolean>(() => soundEngine.getMuted());
-
-  const handleToggleMute = () => {
-    const newState = soundEngine.toggleMuted();
-    setIsAudioMuted(newState);
-    if (!newState) {
-      // Play brief test chime on unmute
-      playAnomalyChime();
-    }
-  };
-
-  // Notification system states: fired conditionally after data resolves if a qualifying case exists
-  const [toastVisible, setToastVisible] = useState(false);
-  const [jitToastVisible, setJitToastVisible] = useState(false);
+  // Notification bell state. Alerts remain available on demand without popup toasts.
   const [hasEscalationFired, setHasEscalationFired] = useState(false);
   const [isBellPulsing, setIsBellPulsing] = useState(false);
   const [notificationBellOpen, setNotificationBellOpen] = useState(false);
@@ -172,7 +152,6 @@ export function OrgOverview({
     if (!qualifyingEscalatedEntity || hasEscalationFired) return;
 
     const timer = setTimeout(() => {
-      setToastVisible(true);
       setHasEscalationFired(true);
       setIsBellPulsing(true);
 
@@ -185,16 +164,6 @@ export function OrgOverview({
 
     return () => clearTimeout(timer);
   }, [qualifyingEscalatedEntity, hasEscalationFired]);
-
-  // Alert reviewer / analyst about Priya's paused sensitive access request
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (activeView !== 'access-requests') {
-        setJitToastVisible(true);
-      }
-    }, 2800);
-    return () => clearTimeout(timer);
-  }, [activeView]);
 
   // Sync URL when switching views
   const handleSwitchView = (view: '3d-graph' | 'threat-map' | 'matrix' | 'access-requests') => {
@@ -259,114 +228,18 @@ export function OrgOverview({
   };
 
   return (
-    <div className={`min-h-screen font-sans selection:bg-[#C6613F]/30 selection:text-white transition-colors duration-200 ${
+    <div className={`ikori-console min-h-screen font-sans selection:bg-[#C6613F]/30 selection:text-white transition-colors duration-500 ${
       resolvedTheme === 'dark' ? 'bg-[#060608] text-zinc-100' : 'bg-zinc-50 text-zinc-900'
     }`}>
       {/* 1. Page Header with View Switcher, Role Switcher, Theme Toggle & Notification Bell */}
-      <header className={`sticky top-0 z-40 border-b backdrop-blur-md transition-colors ${
-        resolvedTheme === 'dark' ? 'bg-[#060608]/90 border-white/[0.06]' : 'bg-white/90 border-zinc-200 shadow-xs'
-      }`}>
-        <div className="w-full max-w-[1760px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 h-16 flex items-center justify-between gap-4">
-          {/* Left: Brand + Navigation Breadcrumb */}
-          <div className="flex items-center gap-3">
-            <button
-              onClick={onNavigateHome}
-              className="flex items-center gap-2.5 group outline-none cursor-pointer"
-              title="Return to IKORI Home"
-            >
-              <div className="w-7 h-7 rounded-lg bg-[#C6613F]/15 border border-[#C6613F]/30 flex items-center justify-center text-[#C6613F] group-hover:border-[#C6613F] transition-colors">
-                <Shield className="w-4 h-4" />
-              </div>
-              <span className={`font-bold text-sm tracking-wider group-hover:text-[#C6613F] transition-colors ${
-                resolvedTheme === 'dark' ? 'text-white' : 'text-zinc-900'
-              }`}>
-                IKORI
-              </span>
-            </button>
-
-            <span className="text-zinc-500 font-mono text-xs">/</span>
-
-            <div className="flex items-center gap-2 text-xs font-mono">
-              <span className={`font-medium ${resolvedTheme === 'dark' ? 'text-zinc-300' : 'text-zinc-700'}`}>SOC Console</span>
-              <span className={`px-2 py-0.5 rounded-full text-[10px] border ${
-                resolvedTheme === 'dark' ? 'bg-white/[0.04] text-zinc-400 border-white/[0.06]' : 'bg-zinc-100 text-zinc-600 border-zinc-200'
-              }`}>
-                {entities.length} nodes
-              </span>
-            </div>
-          </div>
+      <ProductHeaderFrame>
+          {/* Left: Brand */}
+          <ProductBrand onHome={onNavigateHome} />
 
           {/* Center: View Switcher (3D Topology vs Threat Map vs Org Matrix vs Access Requests) */}
-          <div className={`flex items-center p-1 rounded-xl border text-xs font-mono shadow-inner ${
-            resolvedTheme === 'dark' ? 'bg-zinc-900/90 border-white/[0.08]' : 'bg-zinc-100 border-zinc-200'
-          }`}>
-            <button
-              onClick={() => handleSwitchView('3d-graph')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                activeView === '3d-graph'
-                  ? 'bg-[#C6613F] text-black font-semibold shadow-sm'
-                  : resolvedTheme === 'dark' ? 'text-zinc-400 hover:text-white' : 'text-zinc-600 hover:text-zinc-900'
-              }`}
-            >
-              <Box className="w-3.5 h-3.5" />
-              <span>3D Graph</span>
-              {hasEscalatedEntity && (
-                <span className="w-1.5 h-1.5 rounded-full bg-[#E8342A] animate-pulse" />
-              )}
-            </button>
+          <ProductNavigation active={activeView} hasGraphAlert={hasEscalatedEntity} onNavigate={(target) => target === 'results' ? onNavigateResults?.() : handleSwitchView(target)} />
 
-            <button
-              onClick={() => handleSwitchView('threat-map')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                activeView === 'threat-map'
-                  ? 'bg-[#C6613F] text-black font-semibold shadow-sm'
-                  : resolvedTheme === 'dark' ? 'text-zinc-400 hover:text-white' : 'text-zinc-600 hover:text-zinc-900'
-              }`}
-            >
-              <Globe className="w-3.5 h-3.5" />
-              <span>Threat Map</span>
-            </button>
-
-            <button
-              onClick={() => handleSwitchView('matrix')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                activeView === 'matrix'
-                  ? 'bg-[#C6613F] text-black font-semibold shadow-sm'
-                  : resolvedTheme === 'dark' ? 'text-zinc-400 hover:text-white' : 'text-zinc-600 hover:text-zinc-900'
-              }`}
-            >
-              <Layers className="w-3.5 h-3.5" />
-              <span>Org Matrix</span>
-            </button>
-
-            <button
-              onClick={() => handleSwitchView('access-requests')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                activeView === 'access-requests'
-                  ? 'bg-[#C6613F] text-black font-semibold shadow-sm'
-                  : resolvedTheme === 'dark' ? 'text-zinc-400 hover:text-white' : 'text-zinc-600 hover:text-zinc-900'
-              }`}
-            >
-              <Key className="w-3.5 h-3.5" />
-              <span>Access Requests</span>
-              <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                1 Paused
-              </span>
-            </button>
-
-            <button
-              onClick={onNavigateResults}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                resolvedTheme === 'dark' ? 'text-zinc-400 hover:text-white' : 'text-zinc-600 hover:text-zinc-900'
-              }`}
-              title="Open Results & Evaluation"
-            >
-              <BarChart3 className="w-3.5 h-3.5" />
-              <span>Results</span>
-            </button>
-          </div>
-
-          {/* Right: Mode Indicator, Role Switcher, Theme Switcher, Notifications */}
+          {/* Right: Mode Indicator, Theme Switcher, Notifications */}
           <div className="flex items-center gap-2">
             {/* Simulation Banner Badge */}
             <div className="hidden lg:flex items-center gap-2 px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs font-mono">
@@ -376,23 +249,7 @@ export function OrgOverview({
               </span>
             </div>
 
-            {/* Role Switcher with separation of duties badge */}
-            <div className="flex items-center gap-1.5">
-              <select
-                value={persona}
-                onChange={(e) => setPersona(e.target.value as any)}
-                className={`border rounded-lg px-2.5 py-1 text-xs font-mono focus:outline-none focus:border-[#C6613F] cursor-pointer ${
-                  resolvedTheme === 'dark' ? 'bg-zinc-900 border-white/10 text-zinc-200' : 'bg-white border-zinc-200 text-zinc-800'
-                }`}
-                title="Switch role persona (Separation of Duties)"
-              >
-                <option value="analyst">Analyst: Alex Thorne (Propose)</option>
-                <option value="reviewer">Reviewer: Sarah Sterling (Approve)</option>
-                <option value="admin">Admin: Elena Rostova (Enforce)</option>
-              </select>
-            </div>
-
-            {/* Theme Toggle (Dark / Light / System) */}
+            {/* Theme Toggle (Dark / Light / IKORI Royal) */}
             <div className={`flex items-center p-0.5 rounded-lg border ${
               resolvedTheme === 'dark' ? 'bg-zinc-900 border-white/10' : 'bg-zinc-100 border-zinc-200'
             }`}>
@@ -419,15 +276,16 @@ export function OrgOverview({
                 <Sun className="w-3.5 h-3.5" />
               </button>
               <button
-                onClick={() => setTheme('system')}
-                title="System preference"
+                onClick={() => setTheme('royal')}
+                title="IKORI Royal palette"
+                aria-label="Use IKORI Royal palette"
                 className={`p-1 rounded cursor-pointer transition-colors ${
-                  theme === 'system'
-                    ? 'bg-[#C6613F] text-black'
+                  theme === 'royal'
+                    ? 'bg-[#E3132B] text-[#FFF7E4] shadow-[0_0_18px_rgba(227,19,43,0.4)]'
                     : resolvedTheme === 'dark' ? 'text-zinc-400 hover:text-white' : 'text-zinc-600 hover:text-zinc-900'
                 }`}
               >
-                <Laptop className="w-3.5 h-3.5" />
+                <Sparkles className="w-3.5 h-3.5" />
               </button>
             </div>
 
@@ -442,22 +300,6 @@ export function OrgOverview({
                 <span className="hidden sm:inline">Reseed</span>
               </button>
             )}
-
-            {/* Sound Effects Mute Toggle */}
-            <button
-              onClick={handleToggleMute}
-              className={`p-2 rounded-lg border transition-all cursor-pointer ${
-                isAudioMuted
-                  ? 'bg-white/[0.02] border-white/[0.08] text-zinc-500 hover:text-zinc-300'
-                  : resolvedTheme === 'dark'
-                  ? 'bg-[#C6613F]/15 border-[#C6613F]/40 text-[#E07B57] hover:bg-[#C6613F]/25'
-                  : 'bg-amber-50 border-amber-200 text-amber-700'
-              }`}
-              title={isAudioMuted ? 'Unmute anomaly sound chime' : 'Mute anomaly sound chime'}
-              aria-label={isAudioMuted ? 'Unmute sound effects' : 'Mute sound effects'}
-            >
-              {isAudioMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-            </button>
 
             {/* Notification Bell */}
             <div className="relative">
@@ -515,7 +357,7 @@ export function OrgOverview({
                       <ArrowUpRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
                     </div>
                     <p className="text-[11px] text-zinc-300 leading-snug">
-                      <strong>Priya Ramesh</strong>: Emergency access to Payments Bastion paused before exposure. Reviewer authorization required.
+                      <strong>{IKORI_PERSONAS.priya}</strong>: Emergency access to Payments Bastion paused before exposure. Reviewer authorization required.
                     </p>
                     <div className="mt-2 text-[10px] font-mono text-zinc-400 flex items-center justify-between">
                       <span className="text-amber-400 font-medium">Review JIT Access →</span>
@@ -537,7 +379,7 @@ export function OrgOverview({
                         <ArrowUpRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
                       </div>
                       <p className="text-[11px] text-zinc-300 leading-snug">
-                        <strong>Devraj Malhotra</strong>: Residual risk 100/100. Singapore ASN ingress + Vault master key read + 4.8 GB S3 dump.
+                        <strong>{IKORI_PERSONAS.devraj}</strong>: Residual risk 100/100. Singapore ASN ingress + Vault master key read + 4.8 GB S3 dump.
                       </p>
                       <div className="mt-2 text-[10px] font-mono text-zinc-400 flex items-center justify-between">
                         <span>Scoped upload hold active</span>
@@ -554,8 +396,7 @@ export function OrgOverview({
               )}
             </div>
           </div>
-        </div>
-      </header>
+      </ProductHeaderFrame>
 
       {/* 2. Main Content Area */}
       <main className="w-full max-w-[1760px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 py-8 space-y-8">
@@ -564,6 +405,8 @@ export function OrgOverview({
           scenarioId={selectedScenarioId}
           onScenarioChange={setSelectedScenarioId}
         />
+
+        <ScenarioOperationsPanel scenarioId={selectedScenarioId} />
 
         {/* Section 2: Visual Topology / Threat Map Switcher */}
         {activeView === '3d-graph' && (
@@ -577,12 +420,9 @@ export function OrgOverview({
                   Selected compiler scenario with candidate relationships and raw event context. Rotate, hover, or select nodes and edges to investigate.
                 </p>
               </div>
-              <span className="px-2.5 py-1 rounded-lg border border-white/10 bg-zinc-900 text-xs font-mono text-zinc-300">
-                Dataset graph: {selectedScenarioId}
-              </span>
             </div>
 
-            <Network3DGraph
+            <Suspense fallback={<ViewFallback />}><Network3DGraph
               entities={entities}
               onSelectEntity={handleOpenEntityCase}
               onOpenCase={handleOpenEntityCase}
@@ -591,21 +431,24 @@ export function OrgOverview({
               departmentFilter={selectedDepartment}
               theme={resolvedTheme}
               scenarioId={selectedScenarioId}
-            />
+            /></Suspense>
           </div>
         )}
 
         {activeView === 'threat-map' && (
           <div className="space-y-4">
-            <ThreatMap
+            <Suspense fallback={<ViewFallback />}><ThreatMap
               entities={entities}
               onOpenCaseDetail={handleOpenEntityCase}
               onUpdateEntityStatus={onUpdateEntityCaseStatus}
-            />
+              onNavigateToAccessRequests={() => handleSwitchView('access-requests')}
+            /></Suspense>
           </div>
         )}
 
-        {activeView === 'matrix' && (
+        {activeView === 'matrix' && <Suspense fallback={<ViewFallback />}><ScenarioAssetMatrix scenarioId={selectedScenarioId} /></Suspense>}
+
+        {false && activeView === 'matrix' && (
           <div className="space-y-8">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/[0.06]">
               <div className="flex items-center gap-2">
@@ -750,48 +593,15 @@ export function OrgOverview({
 
         {/* Section 2D: Context-Aware Just-in-Time Access */}
         {activeView === 'access-requests' && (
-          <AccessRequestsView
+          <Suspense fallback={<ViewFallback />}><AccessRequestsView
             currentPersona={persona}
             onSwitchPersona={setPersona}
             onNavigateToCase={handleOpenEntityCase}
-          />
+          /></Suspense>
         )}
       </main>
 
-      {/* 3. Toast Notifications Stack (Stacked vertically one below the other without overlap) */}
-      <aside
-        aria-label="Active Security Notifications"
-        className="fixed top-6 right-6 z-50 flex flex-col gap-3 pointer-events-none w-[420px] max-w-[calc(100vw-2rem)]"
-      >
-        <EscalationToast
-          isVisible={toastVisible && Boolean(qualifyingEscalatedEntity)}
-          caseId={qualifyingEscalatedEntity?.caseId || '104'}
-          actorName={qualifyingEscalatedEntity?.name || 'Devraj Malhotra'}
-          residualRisk={qualifyingEscalatedEntity?.riskScore || 100}
-          primaryCause="Unapproved Singapore ASN ingress + Vault master key read + 4.8 GB S3 dump"
-          onReview={() => {
-            setToastVisible(false);
-            if (qualifyingEscalatedEntity) {
-              handleOpenEntityCase(qualifyingEscalatedEntity.caseId || qualifyingEscalatedEntity.id);
-            }
-          }}
-          onDismiss={() => setToastVisible(false)}
-        />
-
-        <JITNotificationToast
-          isVisible={jitToastVisible}
-          requestId="AR-203"
-          employeeName="Priya Ramesh"
-          resourceName="Payments Production Bastion"
-          onReview={() => {
-            setJitToastVisible(false);
-            handleSwitchView('access-requests');
-          }}
-          onDismiss={() => setJitToastVisible(false)}
-        />
-      </aside>
-
-      {/* 4. Contextualized / Under Review Drawer */}
+      {/* 3. Contextualized / Under Review Drawer */}
       <ContextualizedDrawer
         isOpen={isContextualizedDrawerOpen}
         onClose={() => setIsContextualizedDrawerOpen(false)}
@@ -802,7 +612,7 @@ export function OrgOverview({
         }}
       />
 
-      {/* 5. Slide-In Case Detail Drawer */}
+      {/* 4. Slide-In Case Detail Drawer */}
       {!onNavigateToCase && activeDrawerEntity && (
         <CaseDetailDrawer
           entity={activeDrawerEntity}

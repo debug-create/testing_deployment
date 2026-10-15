@@ -33,7 +33,7 @@ export function useJITAccess() {
 
   useEffect(() => {
     // Check if any request is active and running countdown
-    const hasActive = Object.values(requests).some(
+    const hasActive = (Object.values(requests) as AccessRequestItem[]).some(
       (r) => r.currentStatus === 'ACTIVE' && r.remainingSeconds > 0
     );
 
